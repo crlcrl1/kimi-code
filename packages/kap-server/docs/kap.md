@@ -5,29 +5,18 @@ The local server started by `kimi web` (as well as the server embedded in the de
 > **Note:** This protocol is in Beta and may evolve across releases. A running server also serves machine-readable schemas generated directly from its live validation definitions at [`GET /openapi.json`](#address-and-online-schemas) and [`GET /asyncapi.json`](#address-and-online-schemas).
 ## Sections in this document
 
-1. **Overview and Quick Start**: [Agent implementation brief](#agent-implementation-brief), [conventions](#conventions), [authentication](#authentication), [response envelope](#response-envelope), [error codes](#error-codes), and a 5-step [quick start](#quick-start).
+1. **Overview and Quick Start**: [Conventions](#conventions), [address and online schemas](#address-and-online-schemas), [authentication](#authentication), [response envelope](#response-envelope), [error codes](#error-codes), [pagination](#pagination), and a 5-step [quick start](#quick-start).
 2. **[Sessions and Conversations](#sessions-and-conversations)**: Client protocol guide — connecting and subscribing, rendering a conversation turn (`Turn` / `Item`), submitting input and steering, stopping / undoing / compacting, approvals and questions, task output streaming, agent state, and global events. **Start here when building a client.**
 3. **[Session Endpoints](#session-endpoints)**: Reference for all `/api/v1/sessions` REST endpoints (creating, listing and grouping sessions, batch archive/restore, profile settings, session actions, turn pagination, prompt queue, and interaction replies).
 4. **[Service and Configuration Endpoints](#service-and-configuration-endpoints)**: Server metadata, OAuth login and usage, remote control, config, models and providers, workspaces, built-in capabilities and plugins, MCP management, file uploads, and global search.
 5. **[File Endpoints](#file-endpoints)**: Session filesystem, workspace filesystem, host filesystem endpoints, and HTTP streaming/download semantics.
 
-## Agent implementation brief
-
-Use these rules when implementing a Kimi Code client, dashboard, or automation script against KAP:
-
-```text
-Implement a Kimi Code client following the attached Kimi Agent Protocol documentation.
-- Server URL: http://127.0.0.1:58627/api/v1; WebSocket: ws://127.0.0.1:58627/api/v1/ws; credential: YOUR_TOKEN.
-- Use only the messages, endpoints, and fields defined in the spec; skip unknown event types, item types, or fields without failing.
-- Check the envelope `code` field on `/api/v1` JSON responses (excluding 204 empty responses, binary download/export streams, and raw `/openapi.json` / `/asyncapi.json` documents); see "Error codes" for meanings.
-- Generate a session-unique `prompt_id` on the client when submitting input, and resend with the same `prompt_id` on network errors or timeouts.
-```
-
 ## Conventions
 
+- **Forward compatibility**: Ignore unrecognized event types, item types, and fields without failing so clients stay compatible as the protocol adds capabilities.
 - **Naming and time**: KAP-owned REST and WebSocket fields use `snake_case` (passthrough or legacy payloads — such as managed OAuth fields `limit5h`, `usedRatio`, `resetAt`, `userInfo`, `userId`, and the structured `40911` undo payload `{ reason, requestedCount, undoableCount }` — keep their documented `camelCase` keys); timestamps are ISO 8601 strings; durations end with `_ms` (milliseconds).
 - **Opaque IDs**: `session_id`, `turn_id`, `item_id`, `interaction_id`, and `task_id` are opaque strings — do not parse their format. `turn_id` and `item_id` are derived deterministically from persisted engine records, so live events and paginated history return identical IDs.
-- **Action paths**: Non-CRUD operations on a resource or collection use a `:{action}` suffix with `POST`, such as `POST /api/v1/sessions/{session_id}:fork` or `POST /api/v1/sessions:archive`.
+- **Action paths and idempotency**: Non-CRUD operations on a resource or collection use a `:{action}` suffix with `POST`, such as `POST /api/v1/sessions/{session_id}:fork` or `POST /api/v1/sessions:archive`. Generate a session-unique `prompt_id` on the client when submitting input, and resend with the same `prompt_id` on network errors or timeouts.
 - **Reading wire examples**: Protocol walkthrough blocks prefix each line by direction — `C` (WebSocket client → server), `S` (WebSocket server → client), `H` (HTTP request), and `R` (`data` inside the HTTP response envelope):
 
 ```text

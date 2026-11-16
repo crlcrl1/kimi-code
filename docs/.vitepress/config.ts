@@ -59,6 +59,7 @@ const config = withMermaid(defineConfig({
                 { text: '在网页中使用', link: '/zh/guides/web' },
                 { text: '远程控制', link: '/zh/guides/remote-control' },
                 { text: '远程环境', link: '/zh/guides/remote-environment' },
+                { text: 'Kimi Agent Protocol (KAP)', link: '/zh/guides/kap' },
               ],
             },
           ],
@@ -93,7 +94,6 @@ const config = withMermaid(defineConfig({
               items: [
                 { text: 'kimi 命令', link: '/zh/reference/kimi-command' },
                 { text: 'kimi acp 子命令', link: '/zh/reference/kimi-acp' },
-                { text: '服务 API【测试版】', link: '/zh/reference/server-api' },
                 { text: '内置工具', link: '/zh/reference/tools' },
                 { text: '斜杠命令', link: '/zh/reference/slash-commands' },
                 { text: '键盘快捷键', link: '/zh/reference/keyboard' },
@@ -140,6 +140,7 @@ const config = withMermaid(defineConfig({
                 { text: 'Using Kimi Code in the browser', link: '/en/guides/web' },
                 { text: 'Remote Control', link: '/en/guides/remote-control' },
                 { text: 'Remote environments', link: '/en/guides/remote-environment' },
+                { text: 'Kimi Agent Protocol (KAP)', link: '/en/guides/kap' },
               ],
             },
           ],
@@ -174,7 +175,6 @@ const config = withMermaid(defineConfig({
               items: [
                 { text: 'kimi Command', link: '/en/reference/kimi-command' },
                 { text: 'kimi acp Subcommand', link: '/en/reference/kimi-acp' },
-                { text: 'Server API (Beta)', link: '/en/reference/server-api' },
                 { text: 'Built-in Tools', link: '/en/reference/tools' },
                 { text: 'Slash Commands', link: '/en/reference/slash-commands' },
                 { text: 'Keyboard Shortcuts', link: '/en/reference/keyboard' },
