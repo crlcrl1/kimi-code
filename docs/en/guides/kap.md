@@ -9,7 +9,7 @@ KAP decouples Kimi Code's agent engine from any single UI — Kimi Code's own de
 - **Multi-workspace and session management**: Create, resume, fork (`:fork`), archive, and export sessions on local directories or registered [remote environments](./remote-environment.md) (SSH / Docker), with multiple clients connected to the same server in real time.
 - **Structured turn streaming and mid-turn control**: Stream structured `Turn` and `Item` events (reasoning, reply deltas, tool-call stages, and outputs); submit prompts, steer into a running turn (`/steer`), cancel (`:cancel`), undo turns (`:undo`), compact context (`:compact`), or open read-only side chats (`:btw`).
 - **Interactive approvals and background task streams**: Route tool permission requests and structured questions (`interaction` frames) to your own UI or policy logic, and stream or control shell and subagent task output by UTF-8 byte offset.
-- **Role-scoped tokens and passwordless local onboarding**: External clients authenticate with scoped credentials (read-only `viewer` or default `operator`) that isolate host-global provider/config settings and arbitrary host paths; supports subprocess `kimi web --port 0 --json`, local verification-code handshakes, and pure-CLI `kimi access` token management.
+- **Role-scoped tokens and passwordless local onboarding**: External clients authenticate with scoped credentials — read-only `viewer` tokens can only observe state and streams, while `operator` tokens can create and drive agent sessions (granting agent tool and session-workspace file access on the host) while blocking mutations to global providers, config, plugins, MCP, and unscoped `/fs:*` host endpoints; supports subprocess `kimi web --port 0 --json`, local verification-code handshakes, and pure-CLI `kimi access` token management.
 
 ## Choosing an integration method
 
@@ -68,7 +68,8 @@ const ws = new WebSocket(ws_url, [`kimi-code.bearer.${token}`]);
 await new Promise((resolve) => ws.addEventListener('open', resolve, { once: true }));
 
 let promptConsumed = false;
-const done = new Promise((resolve) => {
+const assistantItemIds = new Set();
+const done = new Promise((resolve, reject) => {
   ws.addEventListener('message', async ({ data }) => {
     const frame = JSON.parse(data);
     if (frame.type === 'ping') {
@@ -76,23 +77,27 @@ const done = new Promise((resolve) => {
       return;
     }
     if (frame.type === 'response' && frame.request_id === 'sub-1') {
-      await fetch(`${origin}/api/v1/sessions/${session.id}/prompts`, {
+      const submit = await fetch(`${origin}/api/v1/sessions/${session.id}/prompts`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           prompt_id: 'p-1',
           content: [{ type: 'text', text: 'Summarize this directory in one sentence.' }],
         }),
-      });
+      }).then((r) => r.json());
+      if (submit.code !== 0) {
+        reject(new Error(`Prompt rejected (${submit.code}): ${submit.msg}`));
+      }
       return;
     }
     if (frame.type === 'item.ended' && frame.item.type === 'user_message' && frame.item.prompt_ids?.includes('p-1')) {
       promptConsumed = true;
     }
-    if (frame.type === 'item.started' && frame.item.type === 'assistant_message' && frame.item.text) {
-      process.stdout.write(frame.item.text);
+    if (frame.type === 'item.started' && frame.item.type === 'assistant_message') {
+      assistantItemIds.add(frame.item.item_id);
+      if (frame.item.text) process.stdout.write(frame.item.text);
     }
-    if (frame.type === 'item.delta' && frame.field === 'text') {
+    if (frame.type === 'item.delta' && frame.field === 'text' && assistantItemIds.has(frame.item_id)) {
       process.stdout.write(frame.delta);
     }
     if (frame.type === 'agent' && frame.agent_id === 'main' && frame.status === 'idle' && promptConsumed) {
@@ -103,9 +108,12 @@ const done = new Promise((resolve) => {
 });
 
 ws.send(JSON.stringify({ type: 'subscribe', request_id: 'sub-1', session_id: session.id, agent_ids: ['main'] }));
-await done;
-ws.close();
-proc.kill('SIGTERM');
+try {
+  await done;
+} finally {
+  ws.close();
+  proc.kill('SIGTERM');
+}
 ```
 
 ## Next steps

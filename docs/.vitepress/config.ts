@@ -1,3 +1,5 @@
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { defineConfig } from 'vitepress'
 import { withMermaid } from 'vitepress-plugin-mermaid'
 import llmstxt from 'vitepress-plugin-llms'
@@ -200,6 +202,29 @@ const config = withMermaid(defineConfig({
     socialLinks: [
       { icon: 'github', link: 'https://github.com/MoonshotAI/kimi-code' },
     ],
+  },
+
+  buildEnd(siteConfig) {
+    const outDir = siteConfig.outDir
+    const canonicalKapMd = resolve(siteConfig.root, '../packages/kap-server/docs/kap.md')
+    copyFileSync(canonicalKapMd, resolve(outDir, 'kap.md'))
+
+    const legacyPages = [
+      'server-api',
+      'server-api-conversation',
+      'server-api-sessions',
+      'server-api-service',
+      'server-api-files',
+    ]
+    for (const locale of ['en', 'zh'] as const) {
+      const target = `${base}${locale}/guides/kap.html`
+      const refDir = resolve(outDir, locale, 'reference')
+      mkdirSync(refDir, { recursive: true })
+      const html = `<!DOCTYPE html><html lang="${locale}"><head><meta charset="utf-8"><title>Redirecting…</title><link rel="canonical" href="${target}"><meta http-equiv="refresh" content="0; url=${target}"><script>location.replace(${JSON.stringify(target)})</script></head><body><p>Redirecting to <a href="${target}">${target}</a>…</p></body></html>\n`
+      for (const slug of legacyPages) {
+        writeFileSync(resolve(refDir, `${slug}.html`), html, 'utf8')
+      }
+    }
   },
 
   vite: {

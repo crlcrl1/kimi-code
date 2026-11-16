@@ -199,7 +199,8 @@ const ws = new WebSocket(ws_url, [`kimi-code.bearer.${token}`]);
 await new Promise((resolve) => ws.addEventListener('open', resolve, { once: true }));
 
 let promptConsumed = false;
-const done = new Promise((resolve) => {
+const assistantItemIds = new Set();
+const done = new Promise((resolve, reject) => {
   ws.addEventListener('message', async ({ data }) => {
     const frame = JSON.parse(data);
     if (frame.type === 'ping') {
@@ -207,23 +208,27 @@ const done = new Promise((resolve) => {
       return;
     }
     if (frame.type === 'response' && frame.request_id === 'sub-1') {
-      await fetch(`${origin}/api/v1/sessions/${session.id}/prompts`, {
+      const submit = await fetch(`${origin}/api/v1/sessions/${session.id}/prompts`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           prompt_id: 'p-1',
           content: [{ type: 'text', text: 'Summarize this repository in one sentence.' }],
         }),
-      });
+      }).then((r) => r.json());
+      if (submit.code !== 0) {
+        reject(new Error(`Prompt rejected (${submit.code}): ${submit.msg}`));
+      }
       return;
     }
     if (frame.type === 'item.ended' && frame.item.type === 'user_message' && frame.item.prompt_ids?.includes('p-1')) {
       promptConsumed = true;
     }
-    if (frame.type === 'item.started' && frame.item.type === 'assistant_message' && frame.item.text) {
-      process.stdout.write(frame.item.text);
+    if (frame.type === 'item.started' && frame.item.type === 'assistant_message') {
+      assistantItemIds.add(frame.item.item_id);
+      if (frame.item.text) process.stdout.write(frame.item.text);
     }
-    if (frame.type === 'item.delta' && frame.field === 'text') {
+    if (frame.type === 'item.delta' && frame.field === 'text' && assistantItemIds.has(frame.item_id)) {
       process.stdout.write(frame.delta);
     }
     if (frame.type === 'agent' && frame.agent_id === 'main' && frame.status === 'idle' && promptConsumed) {
@@ -234,9 +239,12 @@ const done = new Promise((resolve) => {
 });
 
 ws.send(JSON.stringify({ type: 'subscribe', request_id: 'sub-1', session_id: session.id, agent_ids: ['main'] }));
-await done;
-ws.close();
-proc.kill('SIGTERM');
+try {
+  await done;
+} finally {
+  ws.close();
+  proc.kill('SIGTERM');
+}
 ```
 
 ---
@@ -345,7 +353,7 @@ Maintain turns per `(session_id, agent_id)` sorted by `ordinal`, and reduce fram
 - **Submitting (`/prompts`)**: Starts immediately (`status: "running"`) when idle, or enters the queue (`status: "queued"`) when busy. Always pass a client-generated `prompt_id` (resending the same `prompt_id` + body is idempotent; reusing `prompt_id` with different content returns `40927`).
 - **Real runtime behavior of `/steer` and `/prompts:steer`**:
   1. **Stream interruption & continuation `Turn`**: When a steer arrives while the model is streaming, the loop immediately interrupts the in-flight model step (`step.outcome = "interrupted"`). Depending on the step boundary, the engine either injects the message into the current turn (`placement: "steer"`) **or** finishes the current turn and immediately starts a **new continuation `Turn` (with a brand-new `turn_id`)** carrying your steered message as `placement: "opener"`.
-  2. **Task-chain completion rule**: Orchestrators must **not** stop waiting on `turn.ended` of the initial `turn_id` alone. Treat work as finished only when: (a) all submitted `prompt_id`s have appeared in `user_message.prompt_ids`, **and** (b) `main`'s `agent` frame reports `status: "idle"` (`compacting: false`). (`turn.ended` is guaranteed to arrive before `agent` `status: "idle"`).
+  2. **Task-chain completion rule**: Orchestrators must **not** stop waiting on `turn.ended` of the initial `turn_id` alone. Treat work for a target agent (`"main"` by default, or the `agent_id` passed to `/prompts` for a side-chat) as finished only when: (a) all submitted `prompt_id`s for that agent have appeared in `user_message.prompt_ids`, **and** (b) that target agent's `agent` frame reports `status: "idle"` (`compacting: false`). (`turn.ended` is guaranteed to arrive before `agent` `status: "idle"`).
   3. **`POST /sessions/{id}/steer` blocks until injection — never block your WS loop**: Direct `POST .../steer` stays open until the agent reaches an injection point. If the agent is currently paused on a pending `interaction` (`approval` or `question`), it cannot reach an injection point until that interaction is answered. **Never `await fetch('/steer')` on the same coroutine/loop that processes WebSocket `interaction` frames**, or your client will deadlock! Handle WebSocket frames concurrently, or resolve pending interactions before calling `/steer`.
 - **Stopping everything (`:cancel` vs. queued prompts)**: `POST /sessions/{id}:cancel` stops the running turn (and background tasks if `include_background: true`), **not** queued prompts. To clear queued work as well, call `POST /sessions/{id}/prompts/{prompt_id}:abort` on queued items first, then `:cancel`.
 - **Undo (`:undo`), compaction (`:compact`), and side-chats (`:btw`)**:
@@ -385,7 +393,7 @@ S {"type": "response", "request_id": "s1-stop", "code": 0, "task": {"task_id": "
 
 - **UTF-8 byte offsets in `task.output`**: `task.output` carries `{ session_id, agent_id, task_id, offset, text }` where `offset` is a **UTF-8 byte offset** (not JS string `.length`). Maintain `endOffset = offset + Buffer.byteLength(text, 'utf8')`. When re-watching with `since_offset: endOffset`, append `text` if `chunk.offset === endOffset`, otherwise replace your buffer starting at `chunk.offset`.
 - **Reconnection**: Subscriptions and `task.watch` streams are connection-scoped. After reconnecting: (1) resend `subscribe` and replace local session state from the fresh snapshots, (2) resend `task.watch` with `since_offset`, and (3) re-fetch REST lists (`GET /api/v1/sessions`, etc.).
-- **Global events**: Sent flat to all connections without subscription: `session` (`change`: `created`/`updated`/`archived`/`restored`/`deleted`), `workspace` (`change`), `config`, `invalidated` (`kind`: `models`/`plugins` → refetch REST endpoint), `event.capability.changed`, and `event.access.request` (`owner` connections only). Changes made on disk by external CLI processes reconcile every ~60 s without WS broadcasts; dashboards should poll `GET /api/v1/sessions` at low frequency (~60 s or on focus).
+- **Global events & archive/restore lifecycle**: Sent flat to all connections without subscription: `session` (`change`: `created`/`updated`/`archived`/`restored`/`deleted`), `workspace` (`change`), `config`, `invalidated` (`kind`: `models`/`plugins` → refetch REST endpoint), `event.capability.changed`, and `event.access.request` (`owner` connections only). Note that archiving or deleting a session evicts its server-side subscriptions — if an archived session is later restored (`change: "restored"`), send `subscribe` again to resume receiving its frames. Changes made on disk by external CLI processes reconcile every ~60 s without WS broadcasts; dashboards should poll `GET /api/v1/sessions` at low frequency (~60 s or on focus).
 
 ### 7. Common pitfalls checklist (verified in agent dogfooding)
 

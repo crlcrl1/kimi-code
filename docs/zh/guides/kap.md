@@ -9,7 +9,7 @@ KAP 将 Kimi Code 的 Agent 引擎与具体界面解耦——官方桌面端与 
 - **多工作区与会话托管**：在本地目录或已注册的[远程环境](./remote-environment.md)（SSH / Docker）上创建、恢复、分叉（`:fork`）、归档和导出会话；多个客户端可同时连接同一服务实例并实时同步状态。
 - **结构化流式对话与中途控制**：按轮次（`Turn`）与条目（`Item`）流式接收思考过程、回复增量、工具调用阶段及输出；随时提交输入、向运行中的轮次插话（`/steer`）、取消（`:cancel`）、按轮次撤销（`:undo`）、手动压缩上下文（`:compact`）或开启只读旁路对话（`:btw`）。
 - **交互审批与后台任务流**：将工具权限审批与结构化提问（`interaction` 帧）交由自定义界面展示，或由上层程序按策略自动答复；按 UTF-8 字节偏移订阅 Shell 与 subagent 任务的实时输出流，支持单独停止或转入后台。
-- **轻量角色隔离与免密接入**：外部客户端使用按角色隔离的独立凭据（只读 `viewer` / 默认读写 `operator`），无法篡改全局供应商与宿主配置，也无法越界读取宿主机任意路径；支持 `kimi web --port 0 --json` 子进程拉起、本机免密核对码握手以及纯 CLI `kimi access` 管理。
+- **轻量角色隔离与免密接入**：外部客户端使用按角色隔离的独立凭据——只读 `viewer` 仅能观测状态与输出，默认 `operator` 可创建并驱动工作区会话（拥有 Agent 运行时的代码与工作区文件操作能力），但禁止篡改宿主全局配置、供应商、插件与 MCP，也禁止调用无会话的宿主机全局文件浏览接口；支持 `kimi web --port 0 --json` 子进程拉起、本机免密核对码握手以及纯 CLI `kimi access` 管理。
 
 ## 选择接入方式
 
@@ -68,7 +68,8 @@ const ws = new WebSocket(ws_url, [`kimi-code.bearer.${token}`]);
 await new Promise((resolve) => ws.addEventListener('open', resolve, { once: true }));
 
 let promptConsumed = false;
-const done = new Promise((resolve) => {
+const assistantItemIds = new Set();
+const done = new Promise((resolve, reject) => {
   ws.addEventListener('message', async ({ data }) => {
     const frame = JSON.parse(data);
     if (frame.type === 'ping') {
@@ -76,23 +77,27 @@ const done = new Promise((resolve) => {
       return;
     }
     if (frame.type === 'response' && frame.request_id === 'sub-1') {
-      await fetch(`${origin}/api/v1/sessions/${session.id}/prompts`, {
+      const submit = await fetch(`${origin}/api/v1/sessions/${session.id}/prompts`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           prompt_id: 'p-1',
           content: [{ type: 'text', text: '用一句话介绍当前目录' }],
         }),
-      });
+      }).then((r) => r.json());
+      if (submit.code !== 0) {
+        reject(new Error(`Prompt rejected (${submit.code}): ${submit.msg}`));
+      }
       return;
     }
     if (frame.type === 'item.ended' && frame.item.type === 'user_message' && frame.item.prompt_ids?.includes('p-1')) {
       promptConsumed = true;
     }
-    if (frame.type === 'item.started' && frame.item.type === 'assistant_message' && frame.item.text) {
-      process.stdout.write(frame.item.text);
+    if (frame.type === 'item.started' && frame.item.type === 'assistant_message') {
+      assistantItemIds.add(frame.item.item_id);
+      if (frame.item.text) process.stdout.write(frame.item.text);
     }
-    if (frame.type === 'item.delta' && frame.field === 'text') {
+    if (frame.type === 'item.delta' && frame.field === 'text' && assistantItemIds.has(frame.item_id)) {
       process.stdout.write(frame.delta);
     }
     if (frame.type === 'agent' && frame.agent_id === 'main' && frame.status === 'idle' && promptConsumed) {
@@ -103,9 +108,12 @@ const done = new Promise((resolve) => {
 });
 
 ws.send(JSON.stringify({ type: 'subscribe', request_id: 'sub-1', session_id: session.id, agent_ids: ['main'] }));
-await done;
-ws.close();
-proc.kill('SIGTERM');
+try {
+  await done;
+} finally {
+  ws.close();
+  proc.kill('SIGTERM');
+}
 ```
 
 ## 下一步
