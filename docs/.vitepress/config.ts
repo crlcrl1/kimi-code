@@ -217,12 +217,13 @@ const config = withMermaid(defineConfig({
       'server-api-files',
     ]
     for (const locale of ['en', 'zh'] as const) {
-      const target = `${base}${locale}/guides/kap.html`
+      const guideTarget = `${base}${locale}/guides/kap.html`
+      const specTarget = `${base}kap.md`
       const quickStartHash = locale === 'zh' ? '#快速开始' : '#quick-start'
       const authHash = locale === 'zh' ? '#连接与鉴权方式' : '#connecting-and-authenticating'
       const refDir = resolve(outDir, locale, 'reference')
       mkdirSync(refDir, { recursive: true })
-      const html = `<!DOCTYPE html><html lang="${locale}"><head><meta charset="utf-8"><title>Redirecting…</title><link rel="canonical" href="${target}"><meta http-equiv="refresh" content="0; url=${target}"><script>(function(){var h=location.hash||'';var m='';if(/auth|鉴权/.test(h))m=${JSON.stringify(authHash)};else if(/quick-start|快速开始/.test(h))m=${JSON.stringify(quickStartHash)};location.replace(${JSON.stringify(target)}+m);})()</script></head><body><p>Redirecting to <a href="${target}">${target}</a>…</p></body></html>\n`
+      const html = `<!DOCTYPE html><html lang="${locale}"><head><meta charset="utf-8"><title>Redirecting…</title><link rel="canonical" href="${guideTarget}"><meta http-equiv="refresh" content="0; url=${guideTarget}"><script>(function(){var h=(location.hash||'').toLowerCase();var g=${JSON.stringify(guideTarget)};var s=${JSON.stringify(specTarget)};var u=g;if(/auth|鉴权/.test(h))u=g+${JSON.stringify(authHash)};else if(/quick-start|快速开始/.test(h))u=g+${JSON.stringify(quickStartHash)};else if(/envelope|error|pagination|convention|schema|错误|分页|约定|信封/.test(h))u=s+'#protocol-conventions-and-evolution';else if(/subscri|turn|item|steer|approval|question|interaction|task|reconnect|global|会话与对话|订阅|轮次|审批|任务|重连/.test(h))u=s+'#websocket-and-conversation-reduction-constitution';else if(h.length>1)u=s+'#complete-endpoint-and-websocket-catalog';location.replace(u);})()</script></head><body><p>Redirecting to <a href="${guideTarget}">${guideTarget}</a>…</p></body></html>\n`
       for (const slug of legacyPages) {
         writeFileSync(resolve(refDir, `${slug}.html`), html, 'utf8')
       }
