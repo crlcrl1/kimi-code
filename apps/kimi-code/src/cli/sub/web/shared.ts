@@ -51,6 +51,7 @@ export interface ParsedServerOptions {
   /** Custom browser tab title for this web UI instance (`--web-title`). */
   webTitle?: string;
   disableOwnerTokenStore?: boolean;
+  enableAccessTokens?: boolean;
   ephemeralTokens?: readonly EphemeralTokenSpec[];
   logToStderr?: boolean;
   onAccessRequestPrompt?: (request: AccessRequestView) => void;

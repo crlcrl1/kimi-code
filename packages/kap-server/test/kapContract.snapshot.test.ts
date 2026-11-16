@@ -28,6 +28,19 @@ function extractPropertySummary(schema: unknown): {
   return { properties: props, required: req };
 }
 
+function summarizeSchema(schema: unknown): unknown {
+  if (typeof schema !== 'object' || schema === null) {
+    return extractPropertySummary(schema);
+  }
+  const s = schema as Record<string, unknown>;
+  if (Array.isArray(s['oneOf']) || Array.isArray(s['anyOf'])) {
+    return {
+      union: ((s['oneOf'] ?? s['anyOf']) as unknown[]).map(extractPropertySummary),
+    };
+  }
+  return extractPropertySummary(schema);
+}
+
 function summarizeSuccessData(op: Record<string, unknown>): unknown {
   const responses = op['responses'] as Record<string, unknown> | undefined;
   const res200 = responses?.['200'] as Record<string, unknown> | undefined;
@@ -128,7 +141,7 @@ describe('KAP OpenAPI + AsyncAPI contract compatibility snapshot', () => {
         const bodySchema = bodyContent?.['schema'];
         restOperations[`${method.toUpperCase()} ${path}`] = {
           parameters,
-          body: bodySchema === undefined ? null : extractPropertySummary(bodySchema),
+          body: bodySchema === undefined ? null : summarizeSchema(bodySchema),
           responseData: summarizeSuccessData(op),
         };
       }

@@ -88,6 +88,7 @@ export async function registerApiV1Routes(
         serverId: opts.serverId ?? ulid(),
         startedAt: new Date().toISOString(),
         dangerousBypassAuth: opts.dangerousBypassAuth === true,
+        accessTokensEnabled: opts.access === undefined || opts.access.handshakeManager !== undefined,
         webTitle: opts.webTitle,
         getExperimentalFlags: async () => {
           await core.accessor.get(IConfigService).ready;

@@ -164,6 +164,11 @@ export async function startServer(opts: ServerStartOptions): Promise<RunningServ
   const homeDir = resolveKimiHome(opts.homeDir);
   const serverVersion = opts.serverVersion ?? getServerVersion();
   const idleReclaimMs = resolveSessionIdleReclaimMs(opts.env ?? process.env);
+  for (const spec of opts.ephemeralTokens ?? []) {
+    if (!spec.token.startsWith('kap_')) {
+      throw new Error('Ephemeral access token must start with "kap_"');
+    }
+  }
   const registry = createInstanceRegistry({
     instancesDir: opts.instancesDir ?? join(homeDir, 'server', 'instances'),
   });
@@ -206,14 +211,10 @@ export async function startServer(opts: ServerStartOptions): Promise<RunningServ
   if (opts.authTokenService !== undefined) {
     authTokenService = opts.authTokenService;
   } else if (opts.disableOwnerTokenStore === true) {
-    const passwordHash = await resolvePasswordHash();
-    passwordConfigured = passwordHash !== undefined;
     authTokenService = {
       _serviceBrand: undefined,
       getToken: () => '',
-      isValid: async (candidate) =>
-        passwordHash !== undefined &&
-        (await (await import('./services/auth/password')).verifyPassword(candidate, passwordHash)),
+      isValid: async () => false,
     };
   } else {
     const tokenStore = await createTokenStore(homeDir);
@@ -410,7 +411,7 @@ export async function startServer(opts: ServerStartOptions): Promise<RunningServ
     configWarningSubscription.dispose();
     pluginChangeSubscription.dispose();
     capabilityInstallSubscription.dispose();
-    accessHandshakeManager.dispose();
+    accessHandshakeManager?.dispose();
     accessTokenStore.dispose();
     accessRequestLimiter.dispose();
     accessExchangeLimiter.dispose();
@@ -457,17 +458,19 @@ export async function startServer(opts: ServerStartOptions): Promise<RunningServ
     logger,
     conversations,
   });
-  const accessHandshakeManager = createAccessHandshakeManager({
-    homeDir,
-    serverId: registration.serverId,
-    tokenStore: accessTokenStore,
-    onRequestEvent: (request) => {
-      broadcaster.sendOwnerEvent({
-        type: 'event.access.request',
-        request,
-      });
-    },
-  });
+  const accessHandshakeManager = accessTokensPersisted
+    ? createAccessHandshakeManager({
+        homeDir,
+        serverId: registration.serverId,
+        tokenStore: accessTokenStore,
+        onRequestEvent: (request) => {
+          broadcaster.sendOwnerEvent({
+            type: 'event.access.request',
+            request,
+          });
+        },
+      })
+    : undefined;
 
   const configService = core.accessor.get(IConfigService);
   const publishConfigWarnings = (diagnostics: readonly ConfigDiagnostic[]): void => {
@@ -582,6 +585,7 @@ export async function startServer(opts: ServerStartOptions): Promise<RunningServ
     registry: connectionRegistry,
     broadcaster,
     onOwnerConnected: (conn) => {
+      if (accessHandshakeManager === undefined) return;
       void accessHandshakeManager
         .listPendingRequests()
         .then((pending) => {

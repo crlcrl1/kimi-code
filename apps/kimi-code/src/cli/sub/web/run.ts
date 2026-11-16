@@ -254,6 +254,7 @@ export async function handleWebCommand(
     ? {
         ...parsed,
         disableOwnerTokenStore: true,
+        enableAccessTokens: false,
         ephemeralTokens: [
           {
             token: ephemeralToken!,
@@ -465,6 +466,7 @@ async function runServerInProcess(
     allowedHosts: options.allowedHosts,
     disableAuth: options.dangerousBypassAuth,
     disableOwnerTokenStore: options.disableOwnerTokenStore,
+    enableAccessTokens: options.enableAccessTokens,
     ephemeralTokens: options.ephemeralTokens,
     onAccessRequestPrompt:
       options.onAccessRequestPrompt ??

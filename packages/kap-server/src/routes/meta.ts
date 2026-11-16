@@ -19,6 +19,7 @@ export interface MetaRouteOptions {
   readonly serverId: string;
   readonly startedAt: string;
   readonly dangerousBypassAuth: boolean;
+  readonly accessTokensEnabled?: boolean;
   readonly webTitle?: string;
   readonly getExperimentalFlags: () => Record<string, boolean> | Promise<Record<string, boolean>>;
   readonly getFeatures: () => MetaFeature[] | Promise<MetaFeature[]>;
@@ -36,7 +37,7 @@ export function registerMetaRoute(app: RouteHost, opts: MetaRouteOptions): void 
       fs_query: true as const,
       mcp: true as const,
       tasks: true as const,
-      access_tokens: true as const,
+      access_tokens: opts.accessTokensEnabled !== false,
     }),
     server_id: opts.serverId,
     started_at: opts.startedAt,

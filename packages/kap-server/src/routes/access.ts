@@ -67,7 +67,7 @@ interface AccessRouteHost {
 
 export interface RegisterAccessRoutesOptions {
   readonly accessTokenStore: AccessTokenStore;
-  readonly handshakeManager: AccessHandshakeManager;
+  readonly handshakeManager?: AccessHandshakeManager;
   readonly allowedOrigins: readonly string[];
   readonly requestLimiter: AuthFailureLimiter;
   readonly exchangeLimiter: AuthFailureLimiter;
@@ -139,6 +139,11 @@ export function registerAccessRoutes(
     meRoute.options,
     meRoute.handler as unknown as Parameters<AccessRouteHost['get']>[2],
   );
+
+  if (opts.handshakeManager === undefined) {
+    return;
+  }
+  const handshakeManager = opts.handshakeManager;
 
   const listPrincipalsRoute = defineRoute(
     {
@@ -227,7 +232,7 @@ export function registerAccessRoutes(
         return;
       }
       opts.requestLimiter.recordFailure(ip);
-      const created = await opts.handshakeManager.createRequest({
+      const created = await handshakeManager.createRequest({
         clientName: req.body.client_name,
         role: req.body.role,
       });
@@ -257,6 +262,7 @@ export function registerAccessRoutes(
       path: '/access/requests/{tail}',
       minRole: 'public',
       params: accessRequestTailParamSchema,
+      body: z.union([resolveAccessRequestBodySchema, exchangeAccessRequestBodySchema]),
       success: {
         data: z.union([resolveAccessRequestResponseSchema, exchangeAccessRequestResponseSchema]),
       },
@@ -301,7 +307,7 @@ export function registerAccessRoutes(
           r.send(errEnvelope(ErrorCode.VALIDATION_FAILED, 'invalid resolve payload', req.id));
           return;
         }
-        const outcome = await opts.handshakeManager.resolveRequest(
+        const outcome = await handshakeManager.resolveRequest(
           parsedTail.id,
           parsedBody.data.decision,
         );
@@ -352,7 +358,7 @@ export function registerAccessRoutes(
         r.send(errEnvelope(ErrorCode.VALIDATION_FAILED, 'invalid exchange payload', req.id));
         return;
       }
-      const outcome = await opts.handshakeManager.exchangeRequest(
+      const outcome = await handshakeManager.exchangeRequest(
         parsedTail.id,
         parsedBody.data.device_code,
       );

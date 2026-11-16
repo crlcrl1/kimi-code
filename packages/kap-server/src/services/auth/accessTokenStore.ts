@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { statSync } from 'node:fs';
-import { mkdir, open, readdir, stat, unlink } from 'node:fs/promises';
+import { mkdir, open, readdir, readFile, rename, rm, stat, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { ulid } from 'ulid';
@@ -144,15 +144,27 @@ async function writeAccessTokenRecords(
   await writePrivateFile(filePath, `${JSON.stringify(payload, null, 2)}\n`);
 }
 
+function isProcessAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    return code === 'EPERM';
+  }
+}
+
 async function withFileLock<T>(targetPath: string, fn: () => Promise<T>): Promise<T> {
   const lockPath = `${targetPath}.lock`;
   await mkdir(dirname(lockPath), { recursive: true, mode: 0o700 });
+  const lockToken = `${process.pid}:${ulid()}`;
   const deadline = Date.now() + 5_000;
   for (;;) {
     try {
       const fh = await open(lockPath, 'wx', 0o600);
       try {
-        await fh.writeFile(`${process.pid}:${Date.now()}`);
+        await fh.writeFile(lockToken);
       } finally {
         await fh.close();
       }
@@ -161,9 +173,22 @@ async function withFileLock<T>(targetPath: string, fn: () => Promise<T>): Promis
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== 'EEXIST') throw error;
       try {
-        const st = await stat(lockPath);
-        if (Date.now() - st.mtimeMs > 10_000) {
-          await unlink(lockPath).catch(() => {});
+        const raw = (await readFile(lockPath, 'utf8')).trim();
+        const holderPid = Number.parseInt(raw.split(':', 1)[0] ?? '', 10);
+        if (Number.isFinite(holderPid) && !isProcessAlive(holderPid)) {
+          const reclaimTmp = `${lockPath}.reclaim.${process.pid}.${ulid()}`;
+          await rename(lockPath, reclaimTmp)
+            .then(async () => {
+              const verify = (await readFile(reclaimTmp, 'utf8').catch(() => '')).trim();
+              if (verify === raw) {
+                await rm(reclaimTmp, { force: true }).catch(() => {});
+              } else {
+                await rename(reclaimTmp, lockPath).catch(async () => {
+                  await rm(reclaimTmp, { force: true }).catch(() => {});
+                });
+              }
+            })
+            .catch(() => {});
           continue;
         }
       } catch {
@@ -178,7 +203,10 @@ async function withFileLock<T>(targetPath: string, fn: () => Promise<T>): Promis
   try {
     return await fn();
   } finally {
-    await unlink(lockPath).catch(() => {});
+    const current = (await readFile(lockPath, 'utf8').catch(() => '')).trim();
+    if (current === lockToken) {
+      await unlink(lockPath).catch(() => {});
+    }
   }
 }
 

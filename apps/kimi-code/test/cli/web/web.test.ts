@@ -1296,6 +1296,7 @@ describe('kimi web --json and kimi access CLI', () => {
     expect(openUrl).not.toHaveBeenCalled();
     expect(resolveToken).not.toHaveBeenCalled();
     expect(calls.options?.disableOwnerTokenStore).toBe(true);
+    expect(calls.options?.enableAccessTokens).toBe(false);
     expect(calls.options?.logToStderr).toBe(true);
     expect(calls.options?.ephemeralTokens).toHaveLength(1);
     expect(calls.options?.ephemeralTokens?.[0]?.role).toBe('operator');

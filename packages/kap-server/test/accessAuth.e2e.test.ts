@@ -258,6 +258,7 @@ describe('KAP access roles, token store, and passwordless handshake', () => {
     const ephem = generateAccessToken();
     const { base } = await boot({
       disableOwnerTokenStore: true,
+      enableAccessTokens: false,
       ephemeralTokens: [{ token: ephem, name: 'json-boot', role: 'operator' }],
     });
 
@@ -272,7 +273,7 @@ describe('KAP access roles, token store, and passwordless handshake', () => {
       data: { capabilities: Record<string, boolean> };
     };
     expect(metaBody.code).toBe(0);
-    expect(metaBody.data.capabilities['access_tokens']).toBe(true);
+    expect(metaBody.data.capabilities['access_tokens']).toBe(false);
 
     const meRes = await fetch(`${base}/api/v1/access/me`, {
       headers: { Authorization: `Bearer ${ephem}` },
