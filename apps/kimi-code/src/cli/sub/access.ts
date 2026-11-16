@@ -33,11 +33,15 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function sanitizeTerminalText(value: string): string {
+  return value.replaceAll(/[\u0000-\u001F\u007F-\u009F]+/g, ' ').trim();
+}
+
 export async function handleAccessCreate(
   deps: AccessCommandDeps,
   opts: { readonly name: string; readonly role: ExternalAccessRole; readonly json: boolean },
 ): Promise<void> {
-  const trimmedName = opts.name.trim();
+  const trimmedName = sanitizeTerminalText(opts.name);
   if (trimmedName.length === 0) {
     throw new Error('--name must not be empty.');
   }
@@ -53,7 +57,7 @@ export async function handleAccessCreate(
   }
   deps.stdout.write(`${created.token}\n`);
   deps.stderr.write(
-    `Created ${created.principal.role} token "${created.principal.name}" (${created.principal.id}). Store this token securely; it will not be shown again.\n`,
+    `Created ${created.principal.role} token "${sanitizeTerminalText(created.principal.name)}" (${created.principal.id}). Store this token securely; it will not be shown again.\n`,
   );
 }
 
@@ -74,7 +78,7 @@ export async function handleAccessList(
     const status = p.revoked_at !== null ? 'revoked' : 'active';
     const lastUsed = p.last_used_at ?? 'never';
     deps.stdout.write(
-      `${p.id}  ${p.role.padEnd(8)}  ${status.padEnd(7)}  created=${p.created_at}  last_used=${lastUsed}  ${p.name}\n`,
+      `${p.id}  ${p.role.padEnd(8)}  ${status.padEnd(7)}  created=${p.created_at}  last_used=${lastUsed}  ${sanitizeTerminalText(p.name)}\n`,
     );
   }
 }
@@ -92,7 +96,7 @@ export async function handleAccessRevoke(
     deps.stdout.write(`${JSON.stringify({ principal: revoked }, null, 2)}\n`);
     return;
   }
-  deps.stdout.write(`Revoked access token ${revoked.id} (${revoked.name}).\n`);
+  deps.stdout.write(`Revoked access token ${revoked.id} (${sanitizeTerminalText(revoked.name)}).\n`);
 }
 
 export async function handleAccessApprove(
@@ -102,13 +106,14 @@ export async function handleAccessApprove(
 ): Promise<void> {
   const outcome = await approveAccessRequestByUserCode(deps.homeDir(), userCode);
   if (!outcome.ok) {
+    const safeCode = sanitizeTerminalText(userCode);
     if (outcome.reason === 'expired') {
-      throw new Error(`Access request for code "${userCode}" has expired.`);
+      throw new Error(`Access request for code "${safeCode}" has expired.`);
     }
     if (outcome.reason === 'already_resolved') {
-      throw new Error(`Access request for code "${userCode}" has already been resolved.`);
+      throw new Error(`Access request for code "${safeCode}" has already been resolved.`);
     }
-    throw new Error(`No pending access request found for code "${userCode}".`);
+    throw new Error(`No pending access request found for code "${safeCode}".`);
   }
   if (opts.json) {
     deps.stdout.write(
@@ -117,7 +122,7 @@ export async function handleAccessApprove(
     return;
   }
   deps.stdout.write(
-    `Approved ${outcome.principal.role} access for "${outcome.principal.name}" (${outcome.principal.id}).\n`,
+    `Approved ${outcome.principal.role} access for "${sanitizeTerminalText(outcome.principal.name)}" (${outcome.principal.id}).\n`,
   );
 }
 

@@ -82,6 +82,10 @@ function generateUserCode(): string {
   return `${raw.slice(0, 4)}-${raw.slice(4, 8)}`;
 }
 
+export function sanitizeClientLabel(value: string): string {
+  return value.replaceAll(/[\u0000-\u001F\u007F-\u009F]+/g, ' ').trim();
+}
+
 function toPrincipalView(record: AccessTokenRecord): AccessPrincipalView {
   return {
     id: record.id,
@@ -166,7 +170,7 @@ async function withFileLock<T>(targetPath: string, fn: () => Promise<T>): Promis
         continue;
       }
       if (Date.now() >= deadline) {
-        throw new Error(`Timed out acquiring lock for ${targetPath}`, { cause: err });
+        throw new Error(`Timed out acquiring lock for ${targetPath}`, { cause: error });
       }
       await new Promise((r) => setTimeout(r, 15));
     }
@@ -189,7 +193,7 @@ export async function createPersistedAccessToken(
     const nowIso = (input.now ?? new Date()).toISOString();
     const record: AccessTokenRecord = {
       id: `tok_${ulid()}`,
-      name: input.name.trim(),
+      name: sanitizeClientLabel(input.name),
       role: input.role,
       token_hash: hashAccessToken(token),
       created_at: nowIso,
@@ -573,33 +577,40 @@ export async function approveAccessRequestByUserCode(
     return { ok: false, reason: 'not_found' };
   }
   matches.sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const record = matches[0]!;
-  if (record.status !== 'pending') {
-    return { ok: false, reason: 'already_resolved' };
-  }
-  if (Date.parse(record.expires_at) <= now.getTime()) {
-    return { ok: false, reason: 'expired' };
-  }
+  const targetId = matches[0]!.request_id;
+  const targetFile = requestFilePath(homeDir, targetId);
+  return withFileLock(targetFile, async () => {
+    const record = await readRequestRecord(targetFile);
+    if (record === undefined) {
+      return { ok: false as const, reason: 'not_found' as const };
+    }
+    if (record.status !== 'pending') {
+      return { ok: false as const, reason: 'already_resolved' as const };
+    }
+    if (Date.parse(record.expires_at) <= now.getTime()) {
+      return { ok: false as const, reason: 'expired' as const };
+    }
 
-  const created = await createPersistedAccessToken(homeDir, {
-    name: record.client_name,
-    role: record.role,
-    now,
+    const created = await createPersistedAccessToken(homeDir, {
+      name: record.client_name,
+      role: record.role,
+      now,
+    });
+    const resolvedAt = now.toISOString();
+    const updated: AccessRequestDiskRecord = {
+      ...record,
+      status: 'approved',
+      resolved_at: resolvedAt,
+      principal_id: created.principal.id,
+      issued_token: created.token,
+    };
+    await writeRequestRecord(homeDir, updated);
+    return {
+      ok: true as const,
+      request: toAccessRequestView(updated, now.getTime()),
+      principal: created.principal,
+    };
   });
-  const resolvedAt = now.toISOString();
-  const updated: AccessRequestDiskRecord = {
-    ...record,
-    status: 'approved',
-    resolved_at: resolvedAt,
-    principal_id: created.principal.id,
-    issued_token: created.token,
-  };
-  await writeRequestRecord(homeDir, updated);
-  return {
-    ok: true,
-    request: toAccessRequestView(updated, now.getTime()),
-    principal: created.principal,
-  };
 }
 
 export interface AccessHandshakeManager {
@@ -704,7 +715,7 @@ export function createAccessHandshakeManager(
           version: 1,
           request_id: requestId,
           server_id: opts.serverId,
-          client_name: input.clientName.trim(),
+          client_name: sanitizeClientLabel(input.clientName),
           role: input.role,
           user_code: userCode,
           device_code_hash: hashAccessToken(deviceCode),
@@ -727,91 +738,99 @@ export function createAccessHandshakeManager(
     },
 
     resolveRequest(requestId, decision) {
-      return enqueue(async () => {
-        const rec = await readRequestRecord(requestFilePath(opts.homeDir, requestId));
-        if (rec === undefined || rec.server_id !== opts.serverId) {
-          return { ok: false as const, reason: 'not_found' as const };
-        }
-        const now = new Date();
-        if (rec.status !== 'pending') {
-          return { ok: false as const, reason: 'already_resolved' as const };
-        }
-        if (Date.parse(rec.expires_at) <= now.getTime()) {
-          const expiredView = toAccessRequestView(rec, now.getTime());
-          knownStatuses.set(requestId, 'expired');
-          opts.onRequestEvent?.(expiredView);
-          return { ok: false as const, reason: 'expired' as const };
-        }
-        let updated: AccessRequestDiskRecord;
-        if (decision === 'approved') {
-          const created = await opts.tokenStore.createToken({
-            name: rec.client_name,
-            role: rec.role,
-          });
-          updated = {
-            ...rec,
-            status: 'approved',
-            resolved_at: now.toISOString(),
-            principal_id: created.principal.id,
-            issued_token: created.token,
-          };
-        } else {
-          updated = {
-            ...rec,
-            status: 'rejected',
-            resolved_at: now.toISOString(),
-          };
-        }
-        await writeRequestRecord(opts.homeDir, updated);
-        const view = toAccessRequestView(updated, now.getTime());
-        knownStatuses.set(requestId, view.status);
-        opts.onRequestEvent?.(view);
-        return { ok: true as const, request: view };
-      });
+      return enqueue(() =>
+        withFileLock(requestFilePath(opts.homeDir, requestId), async () => {
+          const rec = await readRequestRecord(requestFilePath(opts.homeDir, requestId));
+          if (rec === undefined || rec.server_id !== opts.serverId) {
+            return { ok: false as const, reason: 'not_found' as const };
+          }
+          const now = new Date();
+          if (rec.status !== 'pending') {
+            return { ok: false as const, reason: 'already_resolved' as const };
+          }
+          if (Date.parse(rec.expires_at) <= now.getTime()) {
+            const expiredView = toAccessRequestView(rec, now.getTime());
+            knownStatuses.set(requestId, 'expired');
+            opts.onRequestEvent?.(expiredView);
+            return { ok: false as const, reason: 'expired' as const };
+          }
+          let updated: AccessRequestDiskRecord;
+          if (decision === 'approved') {
+            const created = await opts.tokenStore.createToken({
+              name: rec.client_name,
+              role: rec.role,
+            });
+            updated = {
+              ...rec,
+              status: 'approved',
+              resolved_at: now.toISOString(),
+              principal_id: created.principal.id,
+              issued_token: created.token,
+            };
+          } else {
+            updated = {
+              ...rec,
+              status: 'rejected',
+              resolved_at: now.toISOString(),
+            };
+          }
+          await writeRequestRecord(opts.homeDir, updated);
+          const view = toAccessRequestView(updated, now.getTime());
+          knownStatuses.set(requestId, view.status);
+          opts.onRequestEvent?.(view);
+          return { ok: true as const, request: view };
+        }),
+      );
     },
 
     exchangeRequest(requestId, deviceCode) {
-      return enqueue(async () => {
-        const rec = await readRequestRecord(requestFilePath(opts.homeDir, requestId));
-        if (rec === undefined || rec.server_id !== opts.serverId) {
-          return { ok: false as const, reason: 'not_found' as const };
-        }
-        const candidateHash = hashAccessToken(deviceCode);
-        if (!timingSafeHexEqual(candidateHash, rec.device_code_hash)) {
-          return { ok: false as const, reason: 'invalid_device_code' as const };
-        }
-        const nowMs = Date.now();
-        if (rec.status === 'pending') {
-          if (Date.parse(rec.expires_at) <= nowMs) {
-            return { ok: true as const, result: { status: 'expired' as const } };
+      return enqueue(() =>
+        withFileLock(requestFilePath(opts.homeDir, requestId), async () => {
+          const rec = await readRequestRecord(requestFilePath(opts.homeDir, requestId));
+          if (rec === undefined || rec.server_id !== opts.serverId) {
+            return { ok: false as const, reason: 'not_found' as const };
           }
+          const candidateHash = hashAccessToken(deviceCode);
+          if (!timingSafeHexEqual(candidateHash, rec.device_code_hash)) {
+            return { ok: false as const, reason: 'invalid_device_code' as const };
+          }
+          const nowMs = Date.now();
+          if (rec.status === 'pending') {
+            if (Date.parse(rec.expires_at) <= nowMs) {
+              return { ok: true as const, result: { status: 'expired' as const } };
+            }
+            return {
+              ok: true as const,
+              result: { status: 'pending' as const, expires_at: rec.expires_at },
+            };
+          }
+          if (rec.status === 'rejected') {
+            return { ok: true as const, result: { status: 'rejected' as const } };
+          }
+          if (
+            rec.exchanged_at !== undefined ||
+            rec.issued_token === undefined ||
+            rec.principal_id === undefined
+          ) {
+            return { ok: false as const, reason: 'already_exchanged' as const };
+          }
+          const claimed: AccessRequestDiskRecord = {
+            ...rec,
+            issued_token: undefined,
+            exchanged_at: new Date(nowMs).toISOString(),
+          };
+          await writeRequestRecord(opts.homeDir, claimed);
           return {
             ok: true as const,
-            result: { status: 'pending' as const, expires_at: rec.expires_at },
+            result: {
+              status: 'approved' as const,
+              token: rec.issued_token,
+              role: rec.role,
+              principal_id: rec.principal_id,
+            },
           };
-        }
-        if (rec.status === 'rejected') {
-          return { ok: true as const, result: { status: 'rejected' as const } };
-        }
-        if (rec.exchanged_at !== undefined || rec.issued_token === undefined || rec.principal_id === undefined) {
-          return { ok: false as const, reason: 'already_exchanged' as const };
-        }
-        const claimed: AccessRequestDiskRecord = {
-          ...rec,
-          issued_token: undefined,
-          exchanged_at: new Date(nowMs).toISOString(),
-        };
-        await writeRequestRecord(opts.homeDir, claimed);
-        return {
-          ok: true as const,
-          result: {
-            status: 'approved' as const,
-            token: rec.issued_token,
-            role: rec.role,
-            principal_id: rec.principal_id,
-          },
-        };
-      });
+        }),
+      );
     },
 
     async listPendingRequests(): Promise<AccessRequestView[]> {

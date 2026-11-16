@@ -33,7 +33,14 @@ export const revokeAccessPrincipalResponseSchema = z.object({
 });
 
 export const createAccessRequestBodySchema = z.object({
-  client_name: z.string().trim().min(1).max(120),
+  client_name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .refine((v) => !/[\u0000-\u001F\u007F-\u009F]/.test(v), {
+      message: 'client_name must not contain control characters',
+    }),
   role: externalAccessRoleSchema,
 });
 

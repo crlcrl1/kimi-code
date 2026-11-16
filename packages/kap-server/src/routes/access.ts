@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { errEnvelope, okEnvelope } from '../envelope';
 import { getRequestPrincipal } from '../middleware/auth';
 import { defineRoute } from '../middleware/defineRoute';
-import { isOriginAllowed } from '../middleware/origin';
+import { isOriginAllowed, originHost } from '../middleware/origin';
 import {
   AUTH_RATE_LIMIT_CODE,
   type AuthFailureLimiter,
@@ -90,6 +90,12 @@ function rejectUntrustedBrowserOrigin(
 ): boolean {
   const origin = typeof headers['origin'] === 'string' ? headers['origin'] : undefined;
   if (origin === undefined) return false;
+  if (originHost(origin) === undefined && !allowedOrigins.includes(origin)) {
+    reply
+      .code(403)
+      .send(errEnvelope(ErrorCode.ACCESS_FORBIDDEN, 'Origin not allowed', requestId));
+    return true;
+  }
   const host = typeof headers['host'] === 'string' ? headers['host'] : undefined;
   if (!isOriginAllowed(origin, host, allowedOrigins)) {
     reply

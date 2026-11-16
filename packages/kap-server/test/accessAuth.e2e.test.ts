@@ -304,6 +304,25 @@ describe('KAP access roles, token store, and passwordless handshake', () => {
     });
     expect(crossSiteRes.status).toBe(403);
 
+    const nullOriginRes = await fetch(`${base}/api/v1/access/requests`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'null',
+      },
+      body: JSON.stringify({ client_name: 'Sandboxed Iframe', role: 'operator' }),
+    });
+    expect(nullOriginRes.status).toBe(403);
+
+    const ansiNameRes = await fetch(`${base}/api/v1/access/requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_name: 'Bad\u001B[31mName', role: 'operator' }),
+    });
+    expect(((await ansiNameRes.json()) as { code: number }).code).toBe(
+      ErrorCode.VALIDATION_FAILED,
+    );
+
     const reqRes = await fetch(`${base}/api/v1/access/requests`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

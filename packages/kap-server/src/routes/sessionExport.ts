@@ -14,6 +14,7 @@ import {
 import type { KimiHostIdentity } from '@moonshot-ai/kimi-code-oauth';
 
 import { requestLog } from '../lib/requestLog';
+import { getRequestPrincipal } from '../middleware/auth';
 import { defineRoute } from '../middleware/defineRoute';
 import { ErrorCode } from '../protocol/error-codes';
 import { errEnvelope } from '../protocol/envelope';
@@ -104,16 +105,17 @@ export function registerSessionExportRoute(
           return;
         }
 
+        const isOwner = getRequestPrincipal(req).role === 'owner';
         const outputPath = join(tempDir, 'session.zip');
         await core.accessor.get(ISessionExportService).export(
           {
             sessionId: req.params.session_id,
             outputPath,
-            includeGlobalLog: true,
-            includeDesktopLog: req.body.desktop === true,
+            includeGlobalLog: isOwner,
+            includeDesktopLog: isOwner && req.body.desktop === true,
             version: options.hostIdentity.version,
             desktopVersion:
-              req.body.desktop === true ? options.hostIdentity.version : undefined,
+              isOwner && req.body.desktop === true ? options.hostIdentity.version : undefined,
           },
           {
             webLog: req.body.web_log,
