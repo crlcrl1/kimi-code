@@ -94,7 +94,7 @@ Every authenticated caller has a role (`viewer` < `operator` < `owner`), inspect
 | --- | --- | --- | --- |
 | `viewer` | External `kap_...` with `role: "viewer"` | Scoped read-only `GET` endpoints (sessions, turns, prompts, models, providers, workspaces, redacted config, skills, tools, session media/file downloads, `/access/me`, `/openapi.json`, `/asyncapi.json`), `POST /api/v1/search`, + WebSocket `subscribe`, `unsubscribe`, `task.watch`, `task.unwatch`, `ping`/`pong` | Every mutating HTTP endpoint; WebSocket `task.stop` and `task.background`; arbitrary host path reads (`/fs:browse`, `/fs:home`, `/fs:content`); `/workspaces/project-config-dirs`; `/access/principals*`; `/remote-control*`; `/oauth/login`; `/debug/*` |
 | `operator` | Default for `kimi web --json`, `kimi access create`, and handshakes | Everything in `viewer` + full session creation/actions (`POST /sessions`, `:cancel`, `:compact`, `:undo`, `:btw`, `:fork`, `:archive`, `:restore`, `:delete`, `:reload`, `:takeover`, `/profile`, `/title/generate`, `/export`, `/rating`), `/prompts`, `/steer`, `/skills/{name}:activate`, `/interactions/{id}`, `/files` upload & delete, WS `task.stop` & `task.background`, and workspace-bounded `/sessions/{id}/fs:*` + `/workspace/fs:*` (registered `workspace_id` only) | Global `/config` writes, `/providers` & `/models/*:set_default` writes, `/oauth/*` login/logout, `/remote-control*`, `/plugins` & `/capabilities` installs/mutations, global `/mcp/*` writes/tests/OAuth, arbitrary host `/fs:browse` / `/fs:home` / `/fs:content` / `/fs:mkdir` / `/fs:suggest`, `/workspaces` mutations (and raw unregistered paths in `/workspace/fs:*`), `/shutdown`, `/debug/*`, and `/access/requests/{id}:resolve` / `/access/principals*` |
-| `owner` | Host credentials (Desktop launch secret, CLI `--password`, CLI `server.token`) | Full host administration across all routes and WebSocket events | None |
+| `owner` | Host credentials (Desktop launch secret, CLI `KIMI_CODE_PASSWORD`, CLI `server.token`) | Full host administration across all routes and WebSocket events | None |
 
 ---
 
@@ -114,8 +114,9 @@ KAP `/api/v1` enforces three evolution rules so third-party clients work reliabl
 3. **Capability probing via `GET /api/v1/meta`**: Instead of parsing `server_version`, inspect `data.capabilities` on `GET /api/v1/meta` before enabling optional UI controls or calling newly added endpoints:
    ```js
    const { data: meta } = await fetch(`${origin}/api/v1/meta`, { headers }).then((r) => r.json());
-   if (meta.capabilities.access_tokens) {
-     const { data: me } = await fetch(`${origin}/api/v1/access/me`, { headers }).then((r) => r.json());
+   const { data: me } = await fetch(`${origin}/api/v1/access/me`, { headers }).then((r) => r.json());
+   if (meta.capabilities.access_tokens && me.role === 'owner') {
+     const { data: principals } = await fetch(`${origin}/api/v1/access/principals`, { headers }).then((r) => r.json());
    }
    ```
    When a running server predates an optional feature, hide or gracefully degrade that action rather than failing at session boot.
