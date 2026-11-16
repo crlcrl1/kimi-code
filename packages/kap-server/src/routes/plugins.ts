@@ -368,6 +368,7 @@ export function registerPluginsRoutes(
     {
       method: 'POST',
       path: '/plugins/preview',
+      minRole: 'owner',
       body: previewPluginRequestSchema,
       success: { data: pluginCapabilitiesSchema },
       errors: {
@@ -403,6 +404,7 @@ export function registerPluginsRoutes(
     {
       method: 'POST',
       path: '/plugins',
+      minRole: 'owner',
       body: installPluginRequestSchema,
       success: { data: pluginSummarySchema },
       errors: {
@@ -442,6 +444,7 @@ export function registerPluginsRoutes(
     {
       method: 'POST',
       path: '/plugins/{tail}',
+      minRole: 'owner',
       params: pluginIdParamSchema,
       success: { data: z.object({ ok: z.literal(true) }) },
       errors: {

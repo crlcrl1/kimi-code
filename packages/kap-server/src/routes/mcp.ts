@@ -438,6 +438,7 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     {
       method: 'POST',
       path: '/mcp/servers',
+      minRole: 'owner',
       querystring: serverScopedQuerySchema,
       body: globalMcpServerConfigSchema,
       success: { data: z.array(mcpManagedServerSchema) },
@@ -467,6 +468,7 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     {
       method: 'PUT',
       path: '/mcp/servers/{name}',
+      minRole: 'owner',
       params: serverNameParamSchema,
       querystring: serverScopedQuerySchema,
       body: mcpServerConfigBodySchema,
@@ -498,6 +500,7 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     {
       method: 'DELETE',
       path: '/mcp/servers/{name}',
+      minRole: 'owner',
       params: serverNameParamSchema,
       querystring: serverScopedQuerySchema,
       success: { data: z.array(mcpManagedServerSchema) },
@@ -525,6 +528,7 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     {
       method: 'POST',
       path: '/mcp/servers::test',
+      minRole: 'owner',
       body: testServerBodySchema,
       success: { data: mcpServerTestResultSchema },
       errors: namedServerErrorSchemas,
@@ -558,6 +562,7 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     {
       method: 'POST',
       path: '/mcp/servers::inspect',
+      minRole: 'owner',
       body: inspectServersBodySchema,
       success: { data: z.array(mcpServerInspectionSchema) },
       errors: namedServerErrorSchemas,
@@ -616,6 +621,7 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     {
       method: 'POST',
       path: '/mcp/auth::begin',
+      minRole: 'owner',
       body: mcpServerLocatorSchema,
       querystring: serverScopedQuerySchema,
       success: { data: mcpServerAuthBeginResultSchema },
@@ -645,6 +651,7 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     {
       method: 'POST',
       path: '/mcp/auth::complete',
+      minRole: 'owner',
       body: authCompleteBodySchema,
       success: { data: z.null() },
       errors: oauthErrorSchemas,
@@ -683,6 +690,7 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     {
       method: 'POST',
       path: '/mcp/auth::cancel',
+      minRole: 'owner',
       body: authCancelBodySchema,
       success: { data: z.null() },
       errors: oauthErrorSchemas,
@@ -708,6 +716,7 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     {
       method: 'POST',
       path: '/mcp/auth::reset',
+      minRole: 'owner',
       body: mcpServerLocatorSchema,
       querystring: serverScopedQuerySchema,
       success: { data: z.null() },

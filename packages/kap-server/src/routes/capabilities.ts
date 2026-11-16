@@ -124,6 +124,7 @@ export function registerCapabilitiesRoutes(app: CapabilitiesRouteHost, core: Sco
     {
       method: 'POST',
       path: '/capabilities/{tail}',
+      minRole: 'owner',
       params: capabilityTailParamsSchema,
       body: capabilityInstallOptionsSchema.optional(),
       success: { data: capabilityStatusSchema },

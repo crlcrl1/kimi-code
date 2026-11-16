@@ -168,6 +168,7 @@ export function registerModelCatalogRoutes(app: ModelCatalogRouteHost, core: Sco
     {
       method: 'POST',
       path: '/models/{tail}',
+      minRole: 'owner',
       params: modelActionTailParamSchema,
       success: { data: setDefaultModelResponseSchema },
       errors: {
@@ -229,6 +230,7 @@ export function registerModelCatalogRoutes(app: ModelCatalogRouteHost, core: Sco
     {
       method: 'POST',
       path: '/providers',
+      minRole: 'owner',
       body: createProviderRequestSchema,
       success: { data: createProviderResponseSchema },
       errors: {
@@ -316,6 +318,7 @@ export function registerModelCatalogRoutes(app: ModelCatalogRouteHost, core: Sco
     {
       method: 'PUT',
       path: '/providers/{provider_id}',
+      minRole: 'owner',
       params: providerIdParamSchema,
       body: replaceProviderRequestSchema,
       success: { data: replaceProviderResponseSchema },
@@ -488,6 +491,7 @@ export function registerModelCatalogRoutes(app: ModelCatalogRouteHost, core: Sco
     {
       method: 'POST',
       path: '/providers:action',
+      minRole: 'owner',
       params: providerCollectionActionParamSchema,
       body: providerCollectionActionBodySchema.optional(),
       success: {
@@ -534,6 +538,7 @@ export function registerModelCatalogRoutes(app: ModelCatalogRouteHost, core: Sco
     {
       method: 'POST',
       path: '/providers/{tail}',
+      minRole: 'owner',
       params: providerActionTailParamSchema,
       success: { data: refreshProviderModelsResponseSchema },
       errors: {
@@ -617,6 +622,7 @@ export function registerModelCatalogRoutes(app: ModelCatalogRouteHost, core: Sco
     {
       method: 'DELETE',
       path: '/providers/{provider_id}',
+      minRole: 'owner',
       params: providerIdParamSchema,
       errors: {
         [ErrorCode.VALIDATION_FAILED]: {},

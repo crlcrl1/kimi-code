@@ -1,0 +1,3500 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`KAP OpenAPI + AsyncAPI contract compatibility snapshot > keeps public /openapi.json and /asyncapi.json shapes additive and hides internal routes 1`] = `
+{
+  "restOperations": {
+    "DELETE /api/v1/access/principals/{principal_id}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "principal_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "principal",
+        ],
+        "required": [
+          "principal",
+        ],
+      },
+    },
+    "DELETE /api/v1/files/{file_id}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "file_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "deleted",
+        ],
+        "required": [
+          "deleted",
+        ],
+      },
+    },
+    "DELETE /api/v1/mcp/servers/{name}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "cwd",
+          "required": false,
+        },
+        {
+          "in": "path",
+          "name": "name",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "arrayItems": {
+          "properties": [
+            "config",
+            "mutable",
+            "name",
+            "origin",
+            "plugin",
+            "source",
+          ],
+          "required": [
+            "config",
+            "mutable",
+            "name",
+            "origin",
+            "source",
+          ],
+        },
+      },
+    },
+    "DELETE /api/v1/oauth/login": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "provider",
+          "required": false,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "cancelled",
+          "status",
+        ],
+        "required": [
+          "cancelled",
+          "status",
+        ],
+      },
+    },
+    "DELETE /api/v1/providers/{provider_id}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "provider_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [],
+        "required": [],
+      },
+    },
+    "DELETE /api/v1/remote-control/devices/{id}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "ok",
+        ],
+        "required": [
+          "ok",
+        ],
+      },
+    },
+    "DELETE /api/v1/workspaces/{workspace_id}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "workspace_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "deleted",
+        ],
+        "required": [
+          "deleted",
+        ],
+      },
+    },
+    "GET /api/v1/access/me": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "name",
+          "principal_id",
+          "role",
+        ],
+        "required": [
+          "role",
+        ],
+      },
+    },
+    "GET /api/v1/access/principals": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "items",
+        ],
+        "required": [
+          "items",
+        ],
+      },
+    },
+    "GET /api/v1/auth": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "managed_provider",
+          "models_ready",
+          "providers_count",
+        ],
+        "required": [
+          "managed_provider",
+          "models_ready",
+          "providers_count",
+        ],
+      },
+    },
+    "GET /api/v1/capabilities": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "capabilities",
+        ],
+        "required": [
+          "capabilities",
+        ],
+      },
+    },
+    "GET /api/v1/capabilities/{capability_id}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "capability_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "description",
+          "display_name",
+          "id",
+          "install",
+          "plugin_id",
+          "state",
+          "steps",
+          "supported",
+          "version",
+        ],
+        "required": [
+          "description",
+          "display_name",
+          "id",
+          "install",
+          "state",
+          "steps",
+          "supported",
+        ],
+      },
+    },
+    "GET /api/v1/catalog/providers": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "items",
+        ],
+        "required": [
+          "items",
+        ],
+      },
+    },
+    "GET /api/v1/catalog/providers/{catalog_id}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "catalog_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "base_url",
+          "env_key",
+          "guessed",
+          "id",
+          "models",
+          "name",
+          "needs_base_url",
+          "reject_reason",
+          "rejected",
+          "wire_type",
+        ],
+        "required": [
+          "base_url",
+          "env_key",
+          "guessed",
+          "id",
+          "models",
+          "name",
+          "needs_base_url",
+          "reject_reason",
+          "rejected",
+          "wire_type",
+        ],
+      },
+    },
+    "GET /api/v1/config": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "auto_session_title",
+          "background",
+          "default_model",
+          "default_permission_mode",
+          "default_plan_mode",
+          "default_provider",
+          "disable_feedback_survey",
+          "experimental",
+          "extra_skill_dirs",
+          "hooks",
+          "loop_control",
+          "merge_all_available_skills",
+          "models",
+          "permission",
+          "plan_mode",
+          "providers",
+          "raw",
+          "secondary_model",
+          "services",
+          "subagent",
+          "telemetry",
+          "thinking",
+          "yolo",
+        ],
+        "required": [
+          "providers",
+        ],
+      },
+    },
+    "GET /api/v1/files/{file_id}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "file_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "contentTypes": [
+          "application/octet-stream",
+        ],
+      },
+    },
+    "GET /api/v1/fs:browse": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "path",
+          "required": false,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "entries",
+          "parent",
+          "path",
+        ],
+        "required": [
+          "entries",
+          "parent",
+          "path",
+        ],
+      },
+    },
+    "GET /api/v1/fs:content": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "environment_id",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "path",
+          "required": true,
+        },
+      ],
+      "responseData": null,
+    },
+    "GET /api/v1/fs:home": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "home",
+          "recent_roots",
+        ],
+        "required": [
+          "home",
+          "recent_roots",
+        ],
+      },
+    },
+    "GET /api/v1/healthz": {
+      "body": null,
+      "parameters": [],
+      "responseData": null,
+    },
+    "GET /api/v1/mcp/auth-statuses": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "cwd",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "verify",
+          "required": false,
+        },
+      ],
+      "responseData": {
+        "arrayItems": {
+          "properties": [
+            "auth_status",
+            "name",
+          ],
+          "required": [
+            "auth_status",
+            "name",
+          ],
+        },
+      },
+    },
+    "GET /api/v1/mcp/servers": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "cwd",
+          "required": false,
+        },
+      ],
+      "responseData": {
+        "arrayItems": {
+          "properties": [
+            "config",
+            "mutable",
+            "name",
+            "origin",
+            "plugin",
+            "source",
+          ],
+          "required": [
+            "config",
+            "mutable",
+            "name",
+            "origin",
+            "source",
+          ],
+        },
+      },
+    },
+    "GET /api/v1/mcp/servers/{name}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "cwd",
+          "required": false,
+        },
+        {
+          "in": "path",
+          "name": "name",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "config",
+          "mutable",
+          "name",
+          "origin",
+          "plugin",
+          "source",
+        ],
+        "required": [
+          "config",
+          "mutable",
+          "name",
+          "origin",
+          "source",
+        ],
+      },
+    },
+    "GET /api/v1/meta": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "capabilities",
+          "dangerous_bypass_auth",
+          "experimental_flags",
+          "features",
+          "kimi_agent_protocol_version",
+          "open_in_apps",
+          "server_id",
+          "server_version",
+          "started_at",
+          "web_title",
+        ],
+        "required": [
+          "capabilities",
+          "dangerous_bypass_auth",
+          "kimi_agent_protocol_version",
+          "open_in_apps",
+          "server_id",
+          "server_version",
+          "started_at",
+        ],
+      },
+    },
+    "GET /api/v1/models": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "items",
+        ],
+        "required": [
+          "items",
+        ],
+      },
+    },
+    "GET /api/v1/oauth/login": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "provider",
+          "required": false,
+        },
+      ],
+      "responseData": {
+        "union": [
+          {
+            "properties": [
+              "error_message",
+              "expires_at",
+              "expires_in",
+              "flow_id",
+              "interval",
+              "provider",
+              "resolved_at",
+              "status",
+              "user_code",
+              "verification_uri",
+              "verification_uri_complete",
+            ],
+            "required": [
+              "expires_at",
+              "expires_in",
+              "flow_id",
+              "interval",
+              "provider",
+              "status",
+              "user_code",
+              "verification_uri",
+              "verification_uri_complete",
+            ],
+          },
+          {
+            "properties": [],
+            "required": [],
+          },
+        ],
+      },
+    },
+    "GET /api/v1/oauth/region": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "region",
+        ],
+        "required": [
+          "region",
+        ],
+      },
+    },
+    "GET /api/v1/oauth/usage": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "provider",
+          "required": false,
+        },
+      ],
+      "responseData": {
+        "union": [
+          {
+            "properties": [
+              "kind",
+              "quota",
+            ],
+            "required": [
+              "kind",
+              "quota",
+            ],
+          },
+          {
+            "properties": [
+              "kind",
+              "message",
+              "status",
+            ],
+            "required": [
+              "kind",
+              "message",
+            ],
+          },
+        ],
+      },
+    },
+    "GET /api/v1/oauth/userinfo": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "provider",
+          "required": false,
+        },
+      ],
+      "responseData": {
+        "union": [
+          {
+            "properties": [
+              "kind",
+              "userInfo",
+            ],
+            "required": [
+              "kind",
+              "userInfo",
+            ],
+          },
+          {
+            "properties": [
+              "kind",
+              "message",
+              "status",
+            ],
+            "required": [
+              "kind",
+              "message",
+            ],
+          },
+        ],
+      },
+    },
+    "GET /api/v1/plugins": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "plugins",
+        ],
+        "required": [
+          "plugins",
+        ],
+      },
+    },
+    "GET /api/v1/plugins/marketplace": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "entries",
+        ],
+        "required": [
+          "entries",
+        ],
+      },
+    },
+    "GET /api/v1/plugins/{tail}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "locale",
+          "required": false,
+        },
+        {
+          "in": "path",
+          "name": "tail",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "catalog_id",
+          "command_count",
+          "description",
+          "diagnostics",
+          "display_name",
+          "enabled",
+          "enabled_mcp_server_count",
+          "github",
+          "has_errors",
+          "hook_count",
+          "id",
+          "installed_at",
+          "long_description",
+          "manifest_kind",
+          "manifest_path",
+          "mcp_server_count",
+          "mcp_servers",
+          "origin",
+          "original_source",
+          "root",
+          "shadowed_manifest_path",
+          "short_description",
+          "skill_count",
+          "skills",
+          "source",
+          "state",
+          "updated_at",
+          "version",
+        ],
+        "required": [
+          "command_count",
+          "diagnostics",
+          "display_name",
+          "enabled",
+          "enabled_mcp_server_count",
+          "has_errors",
+          "hook_count",
+          "id",
+          "installed_at",
+          "mcp_server_count",
+          "mcp_servers",
+          "origin",
+          "root",
+          "skill_count",
+          "skills",
+          "source",
+          "state",
+        ],
+      },
+    },
+    "GET /api/v1/providers": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "items",
+        ],
+        "required": [
+          "items",
+        ],
+      },
+    },
+    "GET /api/v1/providers/{provider_id}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "provider_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "api_key",
+          "api_key_env",
+          "base_url",
+          "default_model",
+          "has_api_key",
+          "id",
+          "models",
+          "status",
+          "type",
+        ],
+        "required": [
+          "has_api_key",
+          "id",
+          "status",
+          "type",
+        ],
+      },
+    },
+    "GET /api/v1/remote-control": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "conflict",
+          "device_id",
+          "device_name",
+          "enabled",
+          "error",
+          "state",
+          "url",
+        ],
+        "required": [
+          "enabled",
+          "state",
+        ],
+      },
+    },
+    "GET /api/v1/remote-control/devices": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "devices",
+          "max_devices",
+        ],
+        "required": [
+          "devices",
+        ],
+      },
+    },
+    "GET /api/v1/sessions": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "activity",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "after_id",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "archived",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "before_id",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "busy",
+          "required": true,
+        },
+        {
+          "in": "query",
+          "name": "fields",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "group_page_size",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "has_prompt",
+          "required": true,
+        },
+        {
+          "in": "query",
+          "name": "include",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "page",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "page_size",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "page_token",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "sort",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "updated_after",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "updated_before",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "view",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "workspace_id",
+          "required": false,
+        },
+      ],
+      "responseData": {
+        "union": [
+          {
+            "properties": [
+              "has_more",
+              "items",
+              "next_page_token",
+              "total",
+            ],
+            "required": [
+              "has_more",
+              "items",
+              "total",
+            ],
+          },
+          {
+            "properties": [
+              "groups",
+              "has_more",
+              "next_page_token",
+              "total",
+            ],
+            "required": [
+              "groups",
+              "has_more",
+              "total",
+            ],
+          },
+        ],
+      },
+    },
+    "GET /api/v1/sessions/{session_id}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "activity",
+          "archived",
+          "archived_at",
+          "created_at",
+          "cwd",
+          "git",
+          "id",
+          "last_prompt",
+          "last_turn_outcome",
+          "metadata",
+          "pending_interaction",
+          "title",
+          "updated_at",
+          "workspace_id",
+        ],
+        "required": [
+          "activity",
+          "created_at",
+          "cwd",
+          "id",
+          "title",
+          "updated_at",
+          "workspace_id",
+        ],
+      },
+    },
+    "GET /api/v1/sessions/{session_id}/agents/{agent_id}/turns": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "agent_id",
+          "required": true,
+        },
+        {
+          "in": "query",
+          "name": "before_ordinal",
+          "required": false,
+        },
+        {
+          "in": "query",
+          "name": "page_size",
+          "required": false,
+        },
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "has_more",
+          "turns",
+        ],
+        "required": [
+          "has_more",
+          "turns",
+        ],
+      },
+    },
+    "GET /api/v1/sessions/{session_id}/environment": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "cwd",
+          "environment_id",
+          "workspace_id",
+        ],
+        "required": [
+          "environment_id",
+          "workspace_id",
+        ],
+      },
+    },
+    "GET /api/v1/sessions/{session_id}/environments": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "environments",
+        ],
+        "required": [
+          "environments",
+        ],
+      },
+    },
+    "GET /api/v1/sessions/{session_id}/file-history/changes": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+        {
+          "in": "query",
+          "name": "turn_number",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "changes",
+          "recorded",
+        ],
+        "required": [
+          "changes",
+          "recorded",
+        ],
+      },
+    },
+    "GET /api/v1/sessions/{session_id}/file-history/content": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "path",
+          "required": true,
+        },
+        {
+          "in": "query",
+          "name": "phase",
+          "required": false,
+        },
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+        {
+          "in": "query",
+          "name": "turn_number",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "content",
+        ],
+        "required": [
+          "content",
+        ],
+      },
+    },
+    "GET /api/v1/sessions/{session_id}/fs/{*}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "*",
+          "required": true,
+        },
+        {
+          "in": "query",
+          "name": "allow_external_symlinks",
+          "required": false,
+        },
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "contentTypes": [
+          "application/octet-stream",
+        ],
+      },
+    },
+    "GET /api/v1/sessions/{session_id}/media/{file_id}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "file_id",
+          "required": true,
+        },
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": null,
+    },
+    "GET /api/v1/sessions/{session_id}/prompts": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "active",
+          "queued",
+        ],
+        "required": [
+          "active",
+          "queued",
+        ],
+      },
+    },
+    "GET /api/v1/sessions/{session_id}/skills": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "skills",
+        ],
+        "required": [
+          "skills",
+        ],
+      },
+    },
+    "GET /api/v1/sessions/{session_id}/warnings": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "warnings",
+        ],
+        "required": [
+          "warnings",
+        ],
+      },
+    },
+    "GET /api/v1/tools": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "session_id",
+          "required": false,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "tools",
+        ],
+        "required": [
+          "tools",
+        ],
+      },
+    },
+    "GET /api/v1/workspaces": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "items",
+        ],
+        "required": [
+          "items",
+        ],
+      },
+    },
+    "GET /api/v1/workspaces/project-config-dirs": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "query",
+          "name": "root",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "additional_dirs",
+        ],
+        "required": [
+          "additional_dirs",
+        ],
+      },
+    },
+    "GET /api/v1/workspaces/{workspace_id}/skills": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "workspace_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "skills",
+        ],
+        "required": [
+          "skills",
+        ],
+      },
+    },
+    "GET /api/v1/workspaces/{workspace_id}/trust": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "workspace_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "trusted",
+        ],
+        "required": [
+          "trusted",
+        ],
+      },
+    },
+    "GET /asyncapi.json": {
+      "body": null,
+      "parameters": [],
+      "responseData": null,
+    },
+    "GET /openapi.json": {
+      "body": null,
+      "parameters": [],
+      "responseData": null,
+    },
+    "PATCH /api/v1/remote-control/devices/{id}": {
+      "body": {
+        "properties": [
+          "alias",
+        ],
+        "required": [
+          "alias",
+        ],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "ok",
+        ],
+        "required": [
+          "ok",
+        ],
+      },
+    },
+    "PATCH /api/v1/workspaces/{workspace_id}": {
+      "body": {
+        "properties": [
+          "additional_dirs",
+          "name",
+        ],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "workspace_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "additional_dirs",
+          "created_at",
+          "id",
+          "kind",
+          "last_opened_at",
+          "name",
+          "root",
+          "session_count",
+        ],
+        "required": [
+          "additional_dirs",
+          "created_at",
+          "id",
+          "kind",
+          "last_opened_at",
+          "name",
+          "root",
+          "session_count",
+        ],
+      },
+    },
+    "POST /api/v1/access/requests": {
+      "body": {
+        "properties": [
+          "client_name",
+          "role",
+        ],
+        "required": [
+          "client_name",
+          "role",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "device_code",
+          "expires_at",
+          "request_id",
+          "user_code",
+        ],
+        "required": [
+          "device_code",
+          "expires_at",
+          "request_id",
+          "user_code",
+        ],
+      },
+    },
+    "POST /api/v1/access/requests/{tail}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "tail",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "union": [
+          {
+            "properties": [
+              "request",
+            ],
+            "required": [
+              "request",
+            ],
+          },
+          {
+            "properties": [],
+            "required": [],
+          },
+        ],
+      },
+    },
+    "POST /api/v1/capabilities/{tail}": {
+      "body": {
+        "properties": [
+          "stop_running_processes",
+        ],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "tail",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "description",
+          "display_name",
+          "id",
+          "install",
+          "plugin_id",
+          "state",
+          "steps",
+          "supported",
+          "version",
+        ],
+        "required": [
+          "description",
+          "display_name",
+          "id",
+          "install",
+          "state",
+          "steps",
+          "supported",
+        ],
+      },
+    },
+    "POST /api/v1/config": {
+      "body": {
+        "properties": [
+          "auto_session_title",
+          "background",
+          "default_model",
+          "default_permission_mode",
+          "default_plan_mode",
+          "default_provider",
+          "disable_feedback_survey",
+          "experimental",
+          "extra_skill_dirs",
+          "hooks",
+          "loop_control",
+          "merge_all_available_skills",
+          "models",
+          "permission",
+          "plan_mode",
+          "providers",
+          "secondary_model",
+          "services",
+          "subagent",
+          "telemetry",
+          "thinking",
+          "yolo",
+        ],
+        "required": [],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "auto_session_title",
+          "background",
+          "default_model",
+          "default_permission_mode",
+          "default_plan_mode",
+          "default_provider",
+          "disable_feedback_survey",
+          "experimental",
+          "extra_skill_dirs",
+          "hooks",
+          "loop_control",
+          "merge_all_available_skills",
+          "models",
+          "permission",
+          "plan_mode",
+          "providers",
+          "raw",
+          "secondary_model",
+          "services",
+          "subagent",
+          "telemetry",
+          "thinking",
+          "yolo",
+        ],
+        "required": [
+          "providers",
+        ],
+      },
+    },
+    "POST /api/v1/files": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "created_at",
+          "expires_at",
+          "id",
+          "media_type",
+          "name",
+          "size",
+        ],
+        "required": [
+          "created_at",
+          "id",
+          "media_type",
+          "name",
+          "size",
+        ],
+      },
+    },
+    "POST /api/v1/fs:mkdir": {
+      "body": {
+        "properties": [
+          "environment_id",
+          "path",
+        ],
+        "required": [
+          "path",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "path",
+        ],
+        "required": [
+          "path",
+        ],
+      },
+    },
+    "POST /api/v1/fs:suggest": {
+      "body": {
+        "properties": [
+          "exclude_globs",
+          "follow_gitignore",
+          "include_globs",
+          "limit",
+          "query",
+          "roots",
+          "show_hidden",
+          "stream",
+        ],
+        "required": [
+          "query",
+          "roots",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "items",
+          "truncated",
+        ],
+        "required": [
+          "items",
+          "truncated",
+        ],
+      },
+    },
+    "POST /api/v1/mcp/auth:begin": {
+      "body": {
+        "properties": [],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "query",
+          "name": "cwd",
+          "required": false,
+        },
+      ],
+      "responseData": {
+        "union": [
+          {
+            "properties": [
+              "authorization_url",
+              "flow_id",
+              "status",
+            ],
+            "required": [
+              "authorization_url",
+              "flow_id",
+              "status",
+            ],
+          },
+          {
+            "properties": [
+              "status",
+            ],
+            "required": [
+              "status",
+            ],
+          },
+        ],
+      },
+    },
+    "POST /api/v1/mcp/auth:cancel": {
+      "body": {
+        "properties": [
+          "flow_id",
+        ],
+        "required": [
+          "flow_id",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [],
+        "required": [],
+      },
+    },
+    "POST /api/v1/mcp/auth:complete": {
+      "body": {
+        "properties": [
+          "flow_id",
+          "timeout_ms",
+        ],
+        "required": [
+          "flow_id",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [],
+        "required": [],
+      },
+    },
+    "POST /api/v1/mcp/auth:reset": {
+      "body": {
+        "properties": [],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "query",
+          "name": "cwd",
+          "required": false,
+        },
+      ],
+      "responseData": {
+        "properties": [],
+        "required": [],
+      },
+    },
+    "POST /api/v1/mcp/servers": {
+      "body": {
+        "properties": [],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "query",
+          "name": "cwd",
+          "required": false,
+        },
+      ],
+      "responseData": {
+        "arrayItems": {
+          "properties": [
+            "config",
+            "mutable",
+            "name",
+            "origin",
+            "plugin",
+            "source",
+          ],
+          "required": [
+            "config",
+            "mutable",
+            "name",
+            "origin",
+            "source",
+          ],
+        },
+      },
+    },
+    "POST /api/v1/mcp/servers:inspect": {
+      "body": {
+        "properties": [
+          "cwd",
+          "targets",
+        ],
+        "required": [],
+      },
+      "parameters": [],
+      "responseData": {
+        "arrayItems": {
+          "properties": [
+            "auth_status",
+            "canonical_url",
+            "checked_at",
+            "config",
+            "editable",
+            "enabled",
+            "error",
+            "locator",
+            "origin",
+            "runtime_name",
+            "server_id",
+          ],
+          "required": [
+            "auth_status",
+            "config",
+            "editable",
+            "enabled",
+            "locator",
+            "origin",
+            "runtime_name",
+            "server_id",
+          ],
+        },
+      },
+    },
+    "POST /api/v1/mcp/servers:test": {
+      "body": {
+        "properties": [
+          "cwd",
+          "name",
+          "server",
+        ],
+        "required": [],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "output",
+          "success",
+        ],
+        "required": [
+          "output",
+          "success",
+        ],
+      },
+    },
+    "POST /api/v1/models/{tail}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "tail",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "default_model",
+          "model",
+        ],
+        "required": [
+          "default_model",
+          "model",
+        ],
+      },
+    },
+    "POST /api/v1/oauth/login": {
+      "body": {
+        "properties": [
+          "provider",
+          "region",
+        ],
+        "required": [],
+      },
+      "parameters": [],
+      "responseData": {
+        "union": [
+          {
+            "properties": [
+              "expires_at",
+              "expires_in",
+              "flow_id",
+              "interval",
+              "provider",
+              "status",
+              "user_code",
+              "verification_uri",
+              "verification_uri_complete",
+            ],
+            "required": [
+              "expires_at",
+              "expires_in",
+              "flow_id",
+              "interval",
+              "provider",
+              "status",
+              "user_code",
+              "verification_uri",
+              "verification_uri_complete",
+            ],
+          },
+          {
+            "properties": [
+              "flow_id",
+              "provider",
+              "status",
+            ],
+            "required": [
+              "flow_id",
+              "provider",
+              "status",
+            ],
+          },
+        ],
+      },
+    },
+    "POST /api/v1/oauth/logout": {
+      "body": {
+        "properties": [
+          "provider",
+        ],
+        "required": [],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "logged_out",
+          "provider",
+        ],
+        "required": [
+          "logged_out",
+          "provider",
+        ],
+      },
+    },
+    "POST /api/v1/plugins": {
+      "body": {
+        "properties": [],
+        "required": [],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "catalog_id",
+          "command_count",
+          "description",
+          "display_name",
+          "enabled",
+          "enabled_mcp_server_count",
+          "github",
+          "has_errors",
+          "hook_count",
+          "id",
+          "installed_at",
+          "long_description",
+          "mcp_server_count",
+          "origin",
+          "original_source",
+          "short_description",
+          "skill_count",
+          "source",
+          "state",
+          "version",
+        ],
+        "required": [
+          "command_count",
+          "display_name",
+          "enabled",
+          "enabled_mcp_server_count",
+          "has_errors",
+          "hook_count",
+          "id",
+          "installed_at",
+          "mcp_server_count",
+          "origin",
+          "skill_count",
+          "source",
+          "state",
+        ],
+      },
+    },
+    "POST /api/v1/plugins/preview": {
+      "body": {
+        "properties": [
+          "expected_sha256",
+          "expected_version",
+          "locale",
+          "marketplace_id",
+        ],
+        "required": [
+          "marketplace_id",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "mcp_servers",
+          "skills",
+        ],
+        "required": [
+          "mcp_servers",
+          "skills",
+        ],
+      },
+    },
+    "POST /api/v1/plugins/{tail}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "tail",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "ok",
+        ],
+        "required": [
+          "ok",
+        ],
+      },
+    },
+    "POST /api/v1/providers": {
+      "body": {
+        "properties": [
+          "api_key",
+          "api_key_env",
+          "base_url",
+          "default_model",
+          "id",
+          "models",
+          "type",
+        ],
+        "required": [
+          "id",
+          "models",
+          "type",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "api_key_env",
+          "base_url",
+          "default_model",
+          "has_api_key",
+          "id",
+          "models",
+          "status",
+          "type",
+        ],
+        "required": [
+          "has_api_key",
+          "id",
+          "status",
+          "type",
+        ],
+      },
+    },
+    "POST /api/v1/providers/{tail}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "tail",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "changed",
+          "failed",
+          "retired_default",
+          "unchanged",
+        ],
+        "required": [
+          "changed",
+          "failed",
+          "unchanged",
+        ],
+      },
+    },
+    "POST /api/v1/providers{action}": {
+      "body": {
+        "properties": [
+          "api_key",
+          "base_url",
+          "catalog_id",
+          "id",
+          "url",
+        ],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "action",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "union": [
+          {
+            "properties": [
+              "changed",
+              "failed",
+              "retired_default",
+              "unchanged",
+            ],
+            "required": [
+              "changed",
+              "failed",
+              "unchanged",
+            ],
+          },
+          {
+            "properties": [
+              "models_imported",
+              "provider",
+            ],
+            "required": [
+              "models_imported",
+              "provider",
+            ],
+          },
+          {
+            "properties": [
+              "credential_env",
+              "models_imported",
+              "providers",
+            ],
+            "required": [
+              "models_imported",
+              "providers",
+            ],
+          },
+        ],
+      },
+    },
+    "POST /api/v1/remote-control": {
+      "body": {
+        "properties": [
+          "enabled",
+        ],
+        "required": [
+          "enabled",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "conflict",
+          "device_id",
+          "device_name",
+          "enabled",
+          "error",
+          "state",
+          "url",
+        ],
+        "required": [
+          "enabled",
+          "state",
+        ],
+      },
+    },
+    "POST /api/v1/remote-control/devices/{id}/deactivate": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "ok",
+        ],
+        "required": [
+          "ok",
+        ],
+      },
+    },
+    "POST /api/v1/search": {
+      "body": {
+        "properties": [
+          "container",
+          "end_time",
+          "mode",
+          "op",
+          "page_size",
+          "page_token",
+          "query",
+          "role",
+          "sort",
+          "start_time",
+        ],
+        "required": [
+          "query",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "has_more",
+          "incomplete",
+          "index_state",
+          "items",
+          "page_token",
+        ],
+        "required": [
+          "has_more",
+          "index_state",
+          "items",
+        ],
+      },
+    },
+    "POST /api/v1/sessions": {
+      "body": {
+        "properties": [
+          "agent_config",
+          "cwd",
+          "environment_cwd",
+          "environment_id",
+          "metadata",
+          "title",
+          "workspace_id",
+        ],
+        "required": [],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "activity",
+          "archived",
+          "archived_at",
+          "created_at",
+          "cwd",
+          "git",
+          "id",
+          "last_prompt",
+          "last_turn_outcome",
+          "metadata",
+          "pending_interaction",
+          "title",
+          "updated_at",
+          "workspace_id",
+        ],
+        "required": [
+          "activity",
+          "created_at",
+          "cwd",
+          "id",
+          "title",
+          "updated_at",
+          "workspace_id",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}/export": {
+      "body": {
+        "properties": [
+          "desktop",
+          "web_log",
+        ],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": null,
+    },
+    "POST /api/v1/sessions/{session_id}/interactions/{interaction_id}": {
+      "body": {
+        "properties": [],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "interaction_id",
+          "required": true,
+        },
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "ended_at",
+          "outcome",
+        ],
+        "required": [
+          "ended_at",
+          "outcome",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}/profile": {
+      "body": {
+        "properties": [
+          "agent_config",
+          "metadata",
+          "title",
+        ],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "agent",
+          "session",
+        ],
+        "required": [
+          "agent",
+          "session",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}/prompts": {
+      "body": {
+        "properties": [
+          "agent_id",
+          "content",
+          "disabled_tools",
+          "goal_control",
+          "goal_objective",
+          "metadata",
+          "model",
+          "permission_mode",
+          "plan_mode",
+          "profile",
+          "prompt_id",
+          "skills",
+          "swarm_mode",
+          "thinking",
+        ],
+        "required": [
+          "content",
+        ],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "content",
+          "created_at",
+          "metadata",
+          "prompt_id",
+          "status",
+          "user_message_id",
+        ],
+        "required": [
+          "content",
+          "created_at",
+          "prompt_id",
+          "status",
+          "user_message_id",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}/prompts/{tail}": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+        {
+          "in": "path",
+          "name": "tail",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "aborted",
+        ],
+        "required": [
+          "aborted",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}/prompts:steer": {
+      "body": {
+        "properties": [
+          "prompt_ids",
+        ],
+        "required": [
+          "prompt_ids",
+        ],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "prompt_ids",
+          "steered",
+        ],
+        "required": [
+          "prompt_ids",
+          "steered",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}/rating": {
+      "body": {
+        "properties": [],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "appearance",
+        ],
+        "required": [
+          "appearance",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}/skills/{tail}": {
+      "body": {
+        "properties": [
+          "args",
+          "attachments",
+          "metadata",
+          "path",
+          "prompt_id",
+        ],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+        {
+          "in": "path",
+          "name": "tail",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "activated",
+          "skill_name",
+        ],
+        "required": [
+          "activated",
+          "skill_name",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}/steer": {
+      "body": {
+        "properties": [
+          "agent_id",
+          "content",
+          "disabled_tools",
+          "goal_control",
+          "goal_objective",
+          "metadata",
+          "model",
+          "permission_mode",
+          "plan_mode",
+          "profile",
+          "prompt_id",
+          "skills",
+          "swarm_mode",
+          "thinking",
+        ],
+        "required": [
+          "content",
+        ],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "content",
+          "created_at",
+          "metadata",
+          "prompt_id",
+          "status",
+          "user_message_id",
+        ],
+        "required": [
+          "content",
+          "created_at",
+          "prompt_id",
+          "status",
+          "user_message_id",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}/title/generate": {
+      "body": {
+        "properties": [
+          "force",
+          "source",
+        ],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "title",
+        ],
+        "required": [
+          "title",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}/{tail}": {
+      "body": {
+        "properties": [],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+        {
+          "in": "path",
+          "name": "tail",
+          "required": true,
+        },
+      ],
+      "responseData": null,
+    },
+    "POST /api/v1/sessions/{session_id}:archive": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "archived",
+        ],
+        "required": [
+          "archived",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}:cancel": {
+      "body": {
+        "properties": [
+          "agent_id",
+          "include_background",
+        ],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "cancelled",
+        ],
+        "required": [
+          "cancelled",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}:delete": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "deleted",
+        ],
+        "required": [
+          "deleted",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}:reload": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "activity",
+          "archived",
+          "archived_at",
+          "created_at",
+          "cwd",
+          "git",
+          "id",
+          "last_prompt",
+          "last_turn_outcome",
+          "metadata",
+          "pending_interaction",
+          "title",
+          "updated_at",
+          "workspace_id",
+        ],
+        "required": [
+          "activity",
+          "created_at",
+          "cwd",
+          "id",
+          "title",
+          "updated_at",
+          "workspace_id",
+        ],
+      },
+    },
+    "POST /api/v1/sessions/{session_id}:takeover": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "session_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "taken_over",
+        ],
+        "required": [
+          "taken_over",
+        ],
+      },
+    },
+    "POST /api/v1/sessions:archive": {
+      "body": {
+        "properties": [
+          "ids",
+        ],
+        "required": [
+          "ids",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "failed",
+          "results",
+          "succeeded",
+        ],
+        "required": [
+          "failed",
+          "results",
+          "succeeded",
+        ],
+      },
+    },
+    "POST /api/v1/sessions:restore": {
+      "body": {
+        "properties": [
+          "ids",
+        ],
+        "required": [
+          "ids",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "failed",
+          "results",
+          "succeeded",
+        ],
+        "required": [
+          "failed",
+          "results",
+          "succeeded",
+        ],
+      },
+    },
+    "POST /api/v1/shutdown": {
+      "body": null,
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "ok",
+        ],
+        "required": [
+          "ok",
+        ],
+      },
+    },
+    "POST /api/v1/workspace/fs:list": {
+      "body": {
+        "properties": [
+          "allow_external_symlinks",
+          "allow_ignored_globs",
+          "depth",
+          "exclude_globs",
+          "follow_gitignore",
+          "limit",
+          "path",
+          "show_hidden",
+          "sort",
+          "workspace",
+        ],
+        "required": [
+          "workspace",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "children_by_path",
+          "items",
+          "truncated",
+        ],
+        "required": [
+          "items",
+          "truncated",
+        ],
+      },
+    },
+    "POST /api/v1/workspace/fs:search": {
+      "body": {
+        "properties": [
+          "exclude_globs",
+          "follow_gitignore",
+          "include_globs",
+          "limit",
+          "query",
+          "workspace",
+        ],
+        "required": [
+          "query",
+          "workspace",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "items",
+          "truncated",
+        ],
+        "required": [
+          "items",
+          "truncated",
+        ],
+      },
+    },
+    "POST /api/v1/workspace/fs:suggest": {
+      "body": {
+        "properties": [
+          "exclude_globs",
+          "follow_gitignore",
+          "include_globs",
+          "limit",
+          "query",
+          "show_hidden",
+          "stream",
+          "workspace",
+        ],
+        "required": [
+          "query",
+          "workspace",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "items",
+          "truncated",
+        ],
+        "required": [
+          "items",
+          "truncated",
+        ],
+      },
+    },
+    "POST /api/v1/workspaces": {
+      "body": {
+        "properties": [
+          "additional_dirs",
+          "idempotency_key",
+          "name",
+          "root",
+        ],
+        "required": [
+          "root",
+        ],
+      },
+      "parameters": [],
+      "responseData": {
+        "properties": [
+          "additional_dirs",
+          "created_at",
+          "id",
+          "kind",
+          "last_opened_at",
+          "name",
+          "root",
+          "session_count",
+        ],
+        "required": [
+          "additional_dirs",
+          "created_at",
+          "id",
+          "kind",
+          "last_opened_at",
+          "name",
+          "root",
+          "session_count",
+        ],
+      },
+    },
+    "POST /api/v1/workspaces/{workspace_id}/primary": {
+      "body": {
+        "properties": [
+          "path",
+        ],
+        "required": [
+          "path",
+        ],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "workspace_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "additional_dirs",
+          "created_at",
+          "id",
+          "kind",
+          "last_opened_at",
+          "name",
+          "root",
+          "session_count",
+        ],
+        "required": [
+          "additional_dirs",
+          "created_at",
+          "id",
+          "kind",
+          "last_opened_at",
+          "name",
+          "root",
+          "session_count",
+        ],
+      },
+    },
+    "POST /api/v1/workspaces/{workspace_id}/trust": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "workspace_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "trusted",
+        ],
+        "required": [
+          "trusted",
+        ],
+      },
+    },
+    "POST /api/v1/workspaces/{workspace_id}/untrust": {
+      "body": null,
+      "parameters": [
+        {
+          "in": "path",
+          "name": "workspace_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "trusted",
+        ],
+        "required": [
+          "trusted",
+        ],
+      },
+    },
+    "PUT /api/v1/mcp/servers/{name}": {
+      "body": {
+        "properties": [],
+        "required": [],
+      },
+      "parameters": [
+        {
+          "in": "query",
+          "name": "cwd",
+          "required": false,
+        },
+        {
+          "in": "path",
+          "name": "name",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "arrayItems": {
+          "properties": [
+            "config",
+            "mutable",
+            "name",
+            "origin",
+            "plugin",
+            "source",
+          ],
+          "required": [
+            "config",
+            "mutable",
+            "name",
+            "origin",
+            "source",
+          ],
+        },
+      },
+    },
+    "PUT /api/v1/providers/{provider_id}": {
+      "body": {
+        "properties": [
+          "api_key",
+          "api_key_env",
+          "base_url",
+          "default_model",
+          "models",
+          "new_id",
+          "type",
+        ],
+        "required": [
+          "models",
+          "type",
+        ],
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "provider_id",
+          "required": true,
+        },
+      ],
+      "responseData": {
+        "properties": [
+          "provider",
+        ],
+        "required": [
+          "provider",
+        ],
+      },
+    },
+  },
+  "wsMessages": {
+    "agent": {
+      "properties": [
+        "agent_id",
+        "compacting",
+        "event_created_at",
+        "model",
+        "permission_mode",
+        "plan_mode",
+        "session_id",
+        "status",
+        "swarm_mode",
+        "thinking",
+        "tower_mode",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "compacting",
+        "event_created_at",
+        "plan_mode",
+        "session_id",
+        "status",
+        "swarm_mode",
+        "tower_mode",
+        "type",
+      ],
+    },
+    "context": {
+      "properties": [
+        "agent_id",
+        "context_tokens",
+        "event_created_at",
+        "max_context_tokens",
+        "session_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "context_tokens",
+        "event_created_at",
+        "session_id",
+        "type",
+      ],
+    },
+    "goal": {
+      "properties": [
+        "agent_id",
+        "event_created_at",
+        "goal",
+        "session_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "event_created_at",
+        "session_id",
+        "type",
+      ],
+    },
+    "interaction": {
+      "union": [
+        {
+          "properties": [
+            "agent_id",
+            "ended_at",
+            "event_created_at",
+            "interaction_id",
+            "kind",
+            "outcome",
+            "request",
+            "response",
+            "session_id",
+            "status",
+            "tool_call_id",
+            "type",
+          ],
+          "required": [
+            "agent_id",
+            "event_created_at",
+            "interaction_id",
+            "kind",
+            "request",
+            "session_id",
+            "status",
+            "type",
+          ],
+        },
+        {
+          "properties": [
+            "agent_id",
+            "ended_at",
+            "event_created_at",
+            "interaction_id",
+            "kind",
+            "outcome",
+            "request",
+            "response",
+            "session_id",
+            "status",
+            "tool_call_id",
+            "type",
+          ],
+          "required": [
+            "agent_id",
+            "event_created_at",
+            "interaction_id",
+            "kind",
+            "request",
+            "session_id",
+            "status",
+            "type",
+          ],
+        },
+      ],
+    },
+    "item": {
+      "properties": [
+        "agent_id",
+        "event_created_at",
+        "item",
+        "session_id",
+        "turn_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "event_created_at",
+        "item",
+        "session_id",
+        "turn_id",
+        "type",
+      ],
+    },
+    "item.delta": {
+      "properties": [
+        "agent_id",
+        "delta",
+        "event_created_at",
+        "field",
+        "item_id",
+        "session_id",
+        "turn_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "delta",
+        "event_created_at",
+        "field",
+        "item_id",
+        "session_id",
+        "turn_id",
+        "type",
+      ],
+    },
+    "item.removed": {
+      "properties": [
+        "agent_id",
+        "event_created_at",
+        "item_id",
+        "session_id",
+        "turn_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "event_created_at",
+        "item_id",
+        "session_id",
+        "turn_id",
+        "type",
+      ],
+    },
+    "item.updated": {
+      "properties": [
+        "agent_id",
+        "event_created_at",
+        "item_id",
+        "session_id",
+        "set",
+        "turn_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "event_created_at",
+        "item_id",
+        "session_id",
+        "set",
+        "turn_id",
+        "type",
+      ],
+    },
+    "notice": {
+      "properties": [
+        "agent_id",
+        "code",
+        "detail",
+        "event_created_at",
+        "level",
+        "session_id",
+        "title",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "event_created_at",
+        "level",
+        "session_id",
+        "title",
+        "type",
+      ],
+    },
+    "ping": {
+      "properties": [
+        "type",
+      ],
+      "required": [
+        "type",
+      ],
+    },
+    "pong": {
+      "properties": [
+        "type",
+      ],
+      "required": [
+        "type",
+      ],
+    },
+    "response": {
+      "properties": [
+        "code",
+        "msg",
+        "request_id",
+        "task",
+        "type",
+      ],
+      "required": [
+        "code",
+        "request_id",
+        "type",
+      ],
+    },
+    "session_event": {
+      "union": [
+        {
+          "properties": [
+            "change",
+            "event_created_at",
+            "session",
+            "type",
+          ],
+          "required": [
+            "change",
+            "event_created_at",
+            "session",
+            "type",
+          ],
+        },
+        {
+          "properties": [
+            "change",
+            "event_created_at",
+            "type",
+            "workspace",
+          ],
+          "required": [
+            "change",
+            "event_created_at",
+            "type",
+            "workspace",
+          ],
+        },
+        {
+          "properties": [
+            "config",
+            "event_created_at",
+            "type",
+            "warnings",
+          ],
+          "required": [
+            "config",
+            "event_created_at",
+            "type",
+          ],
+        },
+        {
+          "properties": [
+            "event_created_at",
+            "kind",
+            "type",
+          ],
+          "required": [
+            "event_created_at",
+            "kind",
+            "type",
+          ],
+        },
+        {
+          "properties": [
+            "capability_id",
+            "event_created_at",
+            "install",
+            "type",
+          ],
+          "required": [
+            "capability_id",
+            "event_created_at",
+            "install",
+            "type",
+          ],
+        },
+        {
+          "properties": [
+            "event_created_at",
+            "request",
+            "type",
+          ],
+          "required": [
+            "event_created_at",
+            "request",
+            "type",
+          ],
+        },
+      ],
+    },
+    "subscribe": {
+      "properties": [
+        "agent_ids",
+        "request_id",
+        "session_id",
+        "type",
+      ],
+      "required": [
+        "request_id",
+        "session_id",
+        "type",
+      ],
+    },
+    "task": {
+      "properties": [
+        "agent_id",
+        "child_agent_id",
+        "command",
+        "description",
+        "detached",
+        "ended_at",
+        "error",
+        "event_created_at",
+        "kind",
+        "model",
+        "outcome",
+        "parent_tool_call_id",
+        "phase",
+        "result_summary",
+        "session_id",
+        "started_at",
+        "state_reason",
+        "status",
+        "swarm_index",
+        "task_id",
+        "thinking",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "detached",
+        "event_created_at",
+        "kind",
+        "session_id",
+        "status",
+        "task_id",
+        "type",
+      ],
+    },
+    "task.background": {
+      "properties": [
+        "agent_id",
+        "request_id",
+        "session_id",
+        "task_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "request_id",
+        "session_id",
+        "task_id",
+        "type",
+      ],
+    },
+    "task.list": {
+      "properties": [
+        "agent_id",
+        "session_id",
+        "tasks",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "session_id",
+        "tasks",
+        "type",
+      ],
+    },
+    "task.output": {
+      "properties": [
+        "agent_id",
+        "offset",
+        "session_id",
+        "task_id",
+        "text",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "offset",
+        "session_id",
+        "task_id",
+        "text",
+        "type",
+      ],
+    },
+    "task.stop": {
+      "properties": [
+        "agent_id",
+        "request_id",
+        "session_id",
+        "task_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "request_id",
+        "session_id",
+        "task_id",
+        "type",
+      ],
+    },
+    "task.unwatch": {
+      "properties": [
+        "agent_id",
+        "request_id",
+        "session_id",
+        "task_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "request_id",
+        "session_id",
+        "task_id",
+        "type",
+      ],
+    },
+    "task.watch": {
+      "properties": [
+        "agent_id",
+        "request_id",
+        "session_id",
+        "since_offset",
+        "tail_bytes",
+        "task_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "request_id",
+        "session_id",
+        "task_id",
+        "type",
+      ],
+    },
+    "todo": {
+      "properties": [
+        "agent_id",
+        "event_created_at",
+        "items",
+        "session_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "event_created_at",
+        "items",
+        "session_id",
+        "type",
+      ],
+    },
+    "turn": {
+      "properties": [
+        "agent_id",
+        "event_created_at",
+        "session_id",
+        "turn",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "event_created_at",
+        "session_id",
+        "turn",
+        "type",
+      ],
+    },
+    "turn.updated": {
+      "properties": [
+        "agent_id",
+        "event_created_at",
+        "retry",
+        "session_id",
+        "step",
+        "turn_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "event_created_at",
+        "session_id",
+        "turn_id",
+        "type",
+      ],
+    },
+    "turns": {
+      "properties": [
+        "agent_id",
+        "event_created_at",
+        "has_more",
+        "session_id",
+        "turns",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "event_created_at",
+        "has_more",
+        "session_id",
+        "turns",
+        "type",
+      ],
+    },
+    "turns.failed": {
+      "properties": [
+        "agent_id",
+        "code",
+        "event_created_at",
+        "msg",
+        "session_id",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "code",
+        "event_created_at",
+        "msg",
+        "session_id",
+        "type",
+      ],
+    },
+    "turns.removed": {
+      "properties": [
+        "agent_id",
+        "event_created_at",
+        "session_id",
+        "turn_ids",
+        "type",
+      ],
+      "required": [
+        "agent_id",
+        "event_created_at",
+        "session_id",
+        "turn_ids",
+        "type",
+      ],
+    },
+    "unsubscribe": {
+      "properties": [
+        "agent_ids",
+        "request_id",
+        "session_id",
+        "type",
+      ],
+      "required": [
+        "request_id",
+        "session_id",
+        "type",
+      ],
+    },
+  },
+}
+`;

@@ -20,7 +20,7 @@ interface ConfigRouteHost {
   ): unknown;
   post(
     path: string,
-    options: { schema?: Record<string, unknown> },
+    options: { preHandler?: unknown[]; schema?: Record<string, unknown> },
     handler: (
       req: { id: string; body: unknown },
       reply: { send(payload: unknown): void },
@@ -49,6 +49,7 @@ export function registerConfigRoutes(app: ConfigRouteHost, core: Scope): void {
     {
       method: 'POST',
       path: '/config',
+      minRole: 'owner',
       body: patchConfigRequestSchema,
       success: { data: configResponseSchema },
       errors: {

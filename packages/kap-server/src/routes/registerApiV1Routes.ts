@@ -9,6 +9,7 @@ import { ulid } from 'ulid';
 import { okEnvelope } from '../envelope';
 import type { MetaFeature } from '../protocol/rest-meta';
 import type { ConversationService } from '../services/conversation/conversationService';
+import { registerAccessRoutes, type RegisterAccessRoutesOptions } from './access';
 import { registerAuthRoute } from './auth';
 import { registerCapabilitiesRoutes } from './capabilities';
 import { registerClientConfigsRoutes } from './clientConfigs';
@@ -55,6 +56,7 @@ interface ApiV1RouteHost {
 }
 
 export interface RegisterApiV1RoutesOptions {
+  readonly serverId?: string;
   readonly serverVersion: string;
   readonly hostIdentity: KimiHostIdentity;
   readonly debugEndpoints?: boolean;
@@ -63,6 +65,7 @@ export interface RegisterApiV1RoutesOptions {
   readonly conversations: ConversationService;
   readonly sessionRating: SessionRatingHost;
   readonly remoteControl: RemoteControlRouteOptions;
+  readonly access?: RegisterAccessRoutesOptions;
   readonly dangerousBypassAuth?: boolean;
   readonly webTitle?: string;
 }
@@ -82,7 +85,7 @@ export async function registerApiV1Routes(
 
       registerMetaRoute(apiV1, {
         serverVersion: opts.serverVersion,
-        serverId: ulid(),
+        serverId: opts.serverId ?? ulid(),
         startedAt: new Date().toISOString(),
         dangerousBypassAuth: opts.dangerousBypassAuth === true,
         webTitle: opts.webTitle,
@@ -101,6 +104,12 @@ export async function registerApiV1Routes(
             })),
       });
 
+      if (opts.access !== undefined) {
+        registerAccessRoutes(
+          apiV1 as unknown as Parameters<typeof registerAccessRoutes>[0],
+          opts.access,
+        );
+      }
       registerAuthRoute(apiV1 as unknown as Parameters<typeof registerAuthRoute>[0], core);
       registerOAuthRoutes(
         apiV1 as unknown as Parameters<typeof registerOAuthRoutes>[0],

@@ -11,7 +11,13 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { createServerLogger, startServer, type ServerLogger } from '@moonshot-ai/kap-server';
+import {
+  createServerLogger,
+  generateAccessToken,
+  KIMI_AGENT_PROTOCOL_VERSION,
+  startServer,
+  type ServerLogger,
+} from '@moonshot-ai/kap-server';
 import { shutdownTelemetry, track } from '@moonshot-ai/kimi-telemetry';
 import chalk from 'chalk';
 import { type Command, Option } from 'commander';
@@ -70,6 +76,7 @@ interface RoutedServer {
 
 export interface WebCliOptions extends ServerCliOptions {
   open?: boolean;
+  json?: boolean;
   remoteControl?: boolean;
 }
 
@@ -178,6 +185,11 @@ export function buildWebCommand(
   }
   return withServerOptions
     .option('--no-open', 'Do not open the web UI in the default browser.', true)
+    .option(
+      '--json',
+      'Start with an in-memory ephemeral operator token (implies --no-open) and emit a single ready JSON line on stdout.',
+      false,
+    )
     .action(async (opts: WebCliOptions) => {
       try {
         await handleWebCommand(
@@ -190,21 +202,61 @@ export function buildWebCommand(
     });
 }
 
+export function formatJsonBootLine(origin: string, token: string): string {
+  const normalizedOrigin = origin.replace(/\/+$/, '');
+  const url = new URL(normalizedOrigin);
+  const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProtocol}//${url.host}/api/v1/ws`;
+  return `${JSON.stringify({
+    origin: normalizedOrigin,
+    ws_url: wsUrl,
+    token,
+    role: 'operator',
+    kimi_agent_protocol_version: KIMI_AGENT_PROTOCOL_VERSION,
+  })}\n`;
+}
+
 export async function handleWebCommand(
   opts: WebCliOptions,
   deps: WebCommandDeps = DEFAULT_WEB_COMMAND_DEPS,
 ): Promise<void> {
   const parsed = parseServerOptions(opts);
+  const jsonMode = opts.json === true;
+  if (jsonMode && opts.remoteControl === true) {
+    throw new Error('--json cannot be combined with --remote-control.');
+  }
+  if (jsonMode && parsed.dangerousBypassAuth) {
+    throw new Error('--json cannot be combined with --dangerous-bypass-auth.');
+  }
   if (opts.remoteControl === true && parsed.dangerousBypassAuth) {
     throw new Error('--remote-control cannot be combined with --dangerous-bypass-auth.');
   }
   if (opts.remoteControl === true && !isLoopbackHost(parsed.host)) {
     throw new Error('--remote-control requires a loopback host.');
   }
+  const ephemeralToken = jsonMode ? generateAccessToken() : undefined;
+  const runOptions: ParsedServerOptions = jsonMode
+    ? {
+        ...parsed,
+        disableOwnerTokenStore: true,
+        ephemeralTokens: [
+          {
+            token: ephemeralToken!,
+            name: 'cli-json-ephemeral',
+            role: 'operator',
+          },
+        ],
+        logToStderr: true,
+      }
+    : parsed;
   const run = deps.startServerForeground ?? startServerForeground;
   let remoteControl: RemoteControlHandle | undefined;
-  await run(parsed, {
+  await run(runOptions, {
     onReady: async (origin, controls) => {
+      if (jsonMode) {
+        deps.stdout.write(formatJsonBootLine(origin, ephemeralToken!));
+        return;
+      }
       // Resolve the persistent token only once the server is up: a fresh
       // server writes `server.token` on first boot, so reading it beforehand
       // would miss first-time starts and the browser would hit the auth gate.
@@ -365,7 +417,10 @@ async function runServerInProcess(
   // `startServer` returns `{ host, port, close }` rather than `{ address,
   // logger, close }`, so adapt it to the `RoutedServer` surface the rest of
   // this runner consumes.
-  const logger = createServerLogger({ level: options.logLevel });
+  const logger = createServerLogger({
+    level: options.logLevel,
+    stream: options.logToStderr === true ? process.stderr : undefined,
+  });
   const webAssetsDir = serverWebAssetsDir();
   if (webAssetsDir === undefined) {
     logger.info(
@@ -394,6 +449,15 @@ async function runServerInProcess(
     allowRemoteShutdown: options.allowRemoteShutdown,
     allowedHosts: options.allowedHosts,
     disableAuth: options.dangerousBypassAuth,
+    disableOwnerTokenStore: options.disableOwnerTokenStore,
+    ephemeralTokens: options.ephemeralTokens,
+    onAccessRequestPrompt:
+      options.onAccessRequestPrompt ??
+      (options.logToStderr === true
+        ? undefined
+        : (request) => {
+            process.stderr.write(`Run: kimi access approve ${request.user_code}\n`);
+          }),
     webTitle: options.webTitle,
     // Attach the engine's cloud telemetry appender (still gated by the config
     // `telemetry` toggle). Complements the v1 client registered above, which

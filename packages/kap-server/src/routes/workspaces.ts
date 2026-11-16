@@ -92,6 +92,7 @@ export function registerWorkspacesRoutes(app: WorkspaceRouteHost, core: Scope): 
     {
       method: 'POST',
       path: '/workspaces',
+      minRole: 'owner',
       body: createWorkspaceRequestSchema,
       success: { data: createWorkspaceResponseSchema },
       errors: {
@@ -155,6 +156,7 @@ export function registerWorkspacesRoutes(app: WorkspaceRouteHost, core: Scope): 
     {
       method: 'PATCH',
       path: '/workspaces/{workspace_id}',
+      minRole: 'owner',
       params: workspaceIdParamSchema,
       body: updateWorkspaceRequestSchema,
       success: { data: updateWorkspaceResponseSchema },
@@ -214,6 +216,7 @@ export function registerWorkspacesRoutes(app: WorkspaceRouteHost, core: Scope): 
     {
       method: 'DELETE',
       path: '/workspaces/{workspace_id}',
+      minRole: 'owner',
       params: workspaceIdParamSchema,
       success: { data: deleteWorkspaceResponseSchema },
       errors: {
@@ -272,6 +275,7 @@ export function registerWorkspacesRoutes(app: WorkspaceRouteHost, core: Scope): 
     {
       method: 'POST',
       path: '/workspaces/{workspace_id}/trust',
+      minRole: 'owner',
       params: workspaceIdParamSchema,
       success: { data: workspaceTrustResponseSchema },
       errors: {
@@ -297,6 +301,7 @@ export function registerWorkspacesRoutes(app: WorkspaceRouteHost, core: Scope): 
     {
       method: 'POST',
       path: '/workspaces/{workspace_id}/untrust',
+      minRole: 'owner',
       params: workspaceIdParamSchema,
       success: { data: workspaceTrustResponseSchema },
       errors: {
@@ -322,6 +327,7 @@ export function registerWorkspacesRoutes(app: WorkspaceRouteHost, core: Scope): 
     {
       method: 'POST',
       path: '/workspaces/{workspace_id}/primary',
+      minRole: 'owner',
       params: workspaceIdParamSchema,
       body: setPrimaryRequestSchema,
       success: { data: setPrimaryResponseSchema },
@@ -392,6 +398,7 @@ export function registerWorkspacesRoutes(app: WorkspaceRouteHost, core: Scope): 
     {
       method: 'GET',
       path: '/workspaces/project-config-dirs',
+      minRole: 'owner',
       querystring: projectConfigDirsQuerySchema,
       success: { data: projectConfigDirsResponseSchema },
       description: 'Read a project local.toml additional_dir set without mutating anything',

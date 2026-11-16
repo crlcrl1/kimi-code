@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { isoDateTimeSchema } from '@moonshot-ai/agent-core-v2/_base/utils/isoDateTime';
 
 import { capabilityInstallProgressSchema } from './rest-capability';
+import { accessRequestViewSchema } from './rest-access';
 import { configResponseSchema } from './rest-config';
 import { sessionSchema } from './session';
 import { workspaceSchema } from './workspace';
@@ -57,6 +58,12 @@ export const capabilityChangedEventSchema = z.object({
 
 export const capabilityGlobalEventSchema = capabilityChangedEventSchema.extend(eventCreatedAt);
 
+export const accessRequestGlobalEventSchema = z.object({
+  type: z.literal('event.access.request'),
+  request: accessRequestViewSchema,
+  ...eventCreatedAt,
+});
+
 export const configChangedEventSchema = z.object({
   type: z.literal('event.config.changed'),
   changedFields: z.array(z.string().min(1)),
@@ -95,4 +102,5 @@ export const pushEventSchema = z.discriminatedUnion('type', [
   configGlobalEventSchema,
   invalidatedGlobalEventSchema,
   capabilityGlobalEventSchema,
+  accessRequestGlobalEventSchema,
 ]);

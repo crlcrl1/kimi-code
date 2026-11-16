@@ -76,6 +76,7 @@ export function registerOAuthRoutes(
     {
       method: 'POST',
       path: '/oauth/login',
+      minRole: 'owner',
       body: oauthLoginStartRequestSchema,
       success: { data: oauthFlowStartSchema },
       description: 'Start an OAuth device-code flow',
@@ -99,6 +100,7 @@ export function registerOAuthRoutes(
     {
       method: 'GET',
       path: '/oauth/login',
+      minRole: 'owner',
       querystring: oauthLoginQuerySchema,
       success: { data: oauthFlowSnapshotOrNullSchema },
       description: 'Poll the current OAuth device-code flow',
@@ -119,6 +121,7 @@ export function registerOAuthRoutes(
     {
       method: 'DELETE',
       path: '/oauth/login',
+      minRole: 'owner',
       querystring: oauthLoginQuerySchema,
       success: { data: oauthLoginCancelResponseSchema },
       description: 'Cancel the current OAuth device-code flow',
@@ -145,6 +148,7 @@ export function registerOAuthRoutes(
     {
       method: 'POST',
       path: '/oauth/logout',
+      minRole: 'owner',
       body: oauthLogoutRequestSchema,
       success: { data: oauthLogoutResponseSchema },
       errors: { [ErrorCode.INTERNAL_ERROR]: {} },

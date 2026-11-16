@@ -2,6 +2,7 @@ import type { CapabilityInstallProgressWire } from '../../../protocol/rest-capab
 import type { ConfigResponse } from '../../../protocol/rest-config';
 import type { Session } from '../../../protocol/session';
 import type { Workspace } from '../../../protocol/workspace';
+import type { AccessRequestView } from '../../../services/auth/accessTokenStore';
 
 export interface SessionMetaUpdatedEvent {
   readonly type: 'session.meta.updated';
@@ -66,12 +67,18 @@ export interface CapabilityChangedEvent {
   readonly install: CapabilityInstallProgressWire;
 }
 
+export interface AccessRequestEvent {
+  readonly type: 'event.access.request';
+  readonly request: AccessRequestView;
+}
+
 export type PushEvent =
   | SessionGlobalEvent
   | WorkspaceGlobalEvent
   | ConfigGlobalEvent
   | InvalidatedGlobalEvent
-  | CapabilityChangedEvent;
+  | CapabilityChangedEvent
+  | AccessRequestEvent;
 
 export type Event = PushEvent & {
   readonly agentId?: string;

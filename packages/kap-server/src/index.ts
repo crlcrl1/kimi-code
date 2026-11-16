@@ -9,6 +9,37 @@ export {
   rotateServerToken,
   serverTokenPath,
 } from './services/auth/persistentToken';
+export {
+  ACCESS_TOKEN_PREFIX,
+  accessRequestsDir,
+  accessTokensPath,
+  approveAccessRequestByUserCode,
+  createAccessHandshakeManager,
+  createAccessTokenStore,
+  createPersistedAccessToken,
+  generateAccessToken,
+  hashAccessToken,
+  hasMinimumRole,
+  listPersistedAccessPrincipals,
+  normalizeUserCode,
+  revokePersistedAccessPrincipal,
+} from './services/auth/accessTokenStore';
+export type {
+  AccessHandshakeManager,
+  AccessHandshakeManagerOptions,
+  AccessPrincipal,
+  AccessPrincipalView,
+  AccessRequestExchangeResult,
+  AccessRequestStatus,
+  AccessRequestView,
+  AccessRole,
+  AccessTokenRecord,
+  AccessTokenStore,
+  AccessTokenStoreOptions,
+  EphemeralTokenSpec,
+  ExternalAccessRole,
+} from './services/auth/accessTokenStore';
+export { KIMI_AGENT_PROTOCOL_VERSION } from './routes/meta';
 export { createServerLogger } from './services/pinoLoggerService';
 export type {
   CreateLoggerOptions,

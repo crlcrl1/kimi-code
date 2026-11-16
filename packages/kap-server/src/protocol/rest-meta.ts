@@ -10,6 +10,7 @@ export const metaCapabilitiesSchema = z.object({
   fs_query: z.literal(true),
   mcp: z.literal(true),
   tasks: z.literal(true),
+  access_tokens: z.literal(true),
 });
 
 export type MetaCapabilities = z.infer<typeof metaCapabilitiesSchema>;

@@ -10,7 +10,8 @@
 |---|---|---|
 | TUI 交互用户 | `kimi` 默认入口 | `apps/kimi-code/src/tui/` |
 | print 模式用户 | `kimi -p`，含解析 `--output-format stream-json` 输出的脚本。脚本解析者算二等人群，但输出格式变化必须写进 changeset（#3146） | `apps/kimi-code/src/cli/options.ts` |
-| desktop 与 web 用户 | 源码在 code-app 仓库，只消费 kap-server 的 `/api/v1` REST 与 `/api/v1/ws`。本仓 diff 看不到它们的用法，改契约时必须点名让作者去对方仓库核对 | `packages/kap-server/src/routes/`、`packages/kap-server/src/transport/ws/`、`docs/en/reference/server-api.md` |
+| desktop 与 web 用户 | 源码在 code-app 仓库，消费 kap-server 的 `/api/v1` REST 与 `/api/v1/ws`（`owner` 角色）。本仓 diff 看不到它们的用法，改契约时必须点名让作者去对方仓库核对 | `packages/kap-server/src/routes/`、`packages/kap-server/src/transport/ws/`、`docs/en/guides/kap.md`、`packages/kap-server/docs/kap.md` |
+| 第三方 KAP 客户端与多 Agent 编排器（跨服务端版本共存） | 通过 `kimi web --json`、`kimi access` 或 `/api/v1/access/requests` 握手以 `operator`/`viewer` 角色接入 `/api/v1` 与 `/api/v1/ws`；客户端版本与用户本地 Kimi Code 版本独立演进，靠 `GET /api/v1/meta` 的 `capabilities` 探测增量能力 | `packages/kap-server/AGENTS.md`、`packages/kap-server/docs/kap.md`、`docs/{en,zh}/guides/kap.md`、`packages/kap-server/test/kapContract.snapshot.test.ts` |
 | VS Code 扩展用户 | 走 SDK 事件适配层，webview 有自己的渲染契约（#3250：v2 不再发 `display` 字段导致卡片空白） | `apps/vscode/` |
 | ACP 客户端用户 | Zed 等，`kimi acp`。stdio MCP 是 ACP 的默认传输，客户端会无条件发（#3167）；能力矩阵是公开承诺（#3081） | `packages/acp-server/`、`docs/en/reference/kimi-acp.md` |
 | SDK 调用方 | `@moonshot-ai/kimi-code-sdk` 的导出面；其中 `KimiForCodingProvider` 使用 node-sdk 本地 provider 契约，错误类来自 agent-core-v2 | `packages/node-sdk/src/index.ts`、`packages/node-sdk/package.json` 的 `exports`、`packages/node-sdk/src/model-provider.ts` |
@@ -98,10 +99,9 @@ prompt 文本改动影响全体用户，且没有测试能证明"无影响"。�
 | `packages/agent-core-v2/src/**/flag.ts`、`packages/agent-core-v2/src/app/flag/flagRegistry.ts` | experimental flag | `default` 翻转等于面向全体发布，按行为变更处理 |
 | `packages/agent-core-v2/src/human/utils/watch.ts`（热加载开关）以及任何模块级默认常量、`?? true` / `?? false` 兜底被配置键覆盖的地方 | 默认值来源 | 默认翻转必列；退路的 config 路径要有 guard 测试，不能只靠 env；退路是否依赖 ConfigService 先于消费方构造 |
 | `packages/agent-core-v2/docs/wire-manifest.d.ts`、`packages/agent-core-v2/docs/state-manifest.d.ts` | 磁盘会话格式 | 旧会话能否读、回滚到上一版能否读、有无迁移 |
-| `packages/kap-server/test/__snapshots__/apiSurface.snapshot.test.ts.snap`、`packages/kap-server/src/routes/`、`packages/kap-server/src/transport/ws/` | desktop、web、VS Code 的服务端契约 | 消费方在仓库外，点名让作者去 code-app 核对；上一版客户端连新服务端是否仍可用 |
+| `packages/kap-server/test/__snapshots__/{apiSurface.snapshot,kapContract.snapshot}.test.ts.snap`、`packages/kap-server/src/{routes,protocol,transport/ws}/` | desktop、web、VS Code 与第三方 KAP 客户端 / 编排器的公开协议契约 | 必查三项：① 是否破坏跨版本第三方客户端兼容（`/api/v1` 形状只增不删、禁止把可选改必填、省略新参数时默认行为不变，增量能力挂 `meta.capabilities`；同时点名去 code-app 核对）；② 角色权限是否最小化（`viewer`/`operator`/`owner` 边界，严禁把宿主机任意路径 `/fs:*`、全局 `/config`、`/providers`、`/plugins`、`/mcp`、`/oauth`、`/shutdown` 等暴露给 `operator` 或 `viewer`）；③ `packages/kap-server/docs/kap.md`（及必要的 `docs/{en,zh}/guides/kap.md`）是否同步 |
 | `packages/node-sdk/src/index.ts`、`packages/node-sdk/package.json` | SDK 导出面 | 删除或改签名即破坏性变更 |
 | `packages/klient/src/` | SDK 与 ACP 下面的客户端门面契约 | 只改 klient 的 PR 碰不到 node-sdk 导出面，按 SDK 调用方与 ACP 客户端两个人群核行为变化 |
-| `packages/transcript/src/contract/` | kap-server 发给 desktop、web、VS Code 的 transcript 载荷契约 | 消费方在 code-app，点名让作者去核；上一版客户端能否解析新载荷 |
 | `.github/workflows/release.yml`、`_native-build.yml`、`manual-native-bundle.yml`、`vscode-publish.yml`，`apps/kimi-code/scripts/native/`、`apps/kimi-code/scripts/check-web-assets.mjs` | 发布产物 | 按安装方式与平台核：npm 包内容、各平台 native 二进制、VS Code 市场包、内置 web 产物是否仍齐全 |
 | `packages/acp-server/` | ACP 客户端 | 对照 `docs/en/reference/kimi-acp.md` 的能力矩阵逐项核对 |
 | `apps/kimi-code/src/cli/` | 命令行参数、子命令、`--output-format` | 对照 `docs/en/reference/kimi-command.md` |

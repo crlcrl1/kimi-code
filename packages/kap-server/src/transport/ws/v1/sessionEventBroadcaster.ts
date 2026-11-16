@@ -89,6 +89,7 @@ export type BroadcastFrame =
   | ConversationMessage;
 
 export interface BroadcastTarget {
+  readonly role?: 'viewer' | 'operator' | 'owner';
   send(frame: BroadcastFrame, delivery?: BroadcastDelivery): void;
 }
 
@@ -742,13 +743,30 @@ export class SessionEventBroadcaster {
       .catch((error: unknown) => this.logDispatchError(eventType, error));
   }
 
-  private sendGlobal(event: Event): void {
+  sendOwnerEvent(event: Event): void {
     const { agentId: _agentId, sessionId: _sessionId, time, ...fields } = event;
     const envelope = {
       ...fields,
       event_created_at: time !== undefined ? new Date(time).toISOString() : new Date().toISOString(),
     } as EventEnvelope;
     for (const target of this.globalTargets) {
+      if ((target.role ?? 'owner') !== 'owner') continue;
+      try {
+        target.send(envelope, 'immediate');
+      } catch {
+      }
+    }
+  }
+
+  private sendGlobal(event: Event): void {
+    const { agentId: _agentId, sessionId: _sessionId, time, ...fields } = event;
+    const envelope = {
+      ...fields,
+      event_created_at: time !== undefined ? new Date(time).toISOString() : new Date().toISOString(),
+    } as EventEnvelope;
+    const ownerOnly = event.type === 'event.access.request';
+    for (const target of this.globalTargets) {
+      if (ownerOnly && (target.role ?? 'owner') !== 'owner') continue;
       try {
         target.send(envelope, 'immediate');
       } catch {

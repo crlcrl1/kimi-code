@@ -27,6 +27,7 @@ export function registerShutdownRoutes(
     {
       method: 'POST',
       path: '/shutdown',
+      minRole: 'owner',
       success: { data: z.object({ ok: z.literal(true) }) },
       description: 'Gracefully shut down the server',
       tags: ['meta'],
