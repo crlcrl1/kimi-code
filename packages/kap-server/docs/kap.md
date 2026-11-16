@@ -139,7 +139,7 @@ KAP `/api/v1` enforces three evolution rules so third-party clients work reliabl
   }
   ```
   Always check `code === 0` first (`details` optionally provides structured context such as `{ path, message }[]` on `40001` or lock holder metadata on `40931`). Most domain errors return HTTP `200` with non-zero `code`; HTTP status differs only for:
-  - `401` (`40101` missing/invalid credential), `403` (`40301` disallowed `Host`/`Origin` or `40302` `ACCESS_FORBIDDEN`), `429` (`42901` rate limit).
+  - `401` (`40101` missing/invalid credential), `403` (`40301` disallowed `Host`, disallowed `Origin` on WebSocket upgrade, or `40302` `ACCESS_FORBIDDEN` including disallowed `Origin` on public `/access/requests*` — whereas ordinary authenticated REST endpoints omit CORS headers rather than returning `403`), `429` (`42901` rate limit).
   - `201` on provider creation/import (still enveloped), `204` on provider deletion (empty body).
   - Binary download routes (`GET /api/v1/files/{file_id}`, `GET /api/v1/sessions/{session_id}/media/{file_id}`, `GET /api/v1/sessions/{session_id}/fs/*:download`, `GET /api/v1/fs:content`): return raw bytes on `200`/`206` (`Range`) and real `4xx`/`500` HTTP statuses with a JSON error envelope on failure; `GET /api/v1/sessions/{session_id}/fs/*:download` and `GET /api/v1/fs:content` additionally honor `If-None-Match` with an empty `304` (`GET /api/v1/files/{file_id}` and `GET /api/v1/sessions/{session_id}/media/{file_id}` emit `ETag` / `Cache-Control: immutable` without `304` conditional handling; `POST /api/v1/sessions/{session_id}/export` returns a `200` `application/zip` stream or a `200` JSON error envelope, and omits host-wide diagnostic logs when called by non-`owner` roles).
 
@@ -154,7 +154,7 @@ HTTP envelopes and WebSocket `response` frames share the same `code` table:
 | `40003`–`40006` | OAuth-managed provider (`40003`), invalid catalog/registry import (`40004`/`40005`), duplicate workspace directory (`40006`) |
 | `40101` | Missing or invalid bearer token (HTTP `401`) |
 | `40110`–`40113` | LLM auth not ready: provider unconfigured (`40110`), API key missing (`40111`), key rejected (`40112`), model unresolved (`40113`) |
-| `40301` / `40302` | Disallowed `Host` or `Origin` (`40301`, HTTP `403`); insufficient token role or invalid handshake `device_code` (`40302` `ACCESS_FORBIDDEN`, HTTP `403`) |
+| `40301` / `40302` | Disallowed `Host` (or disallowed `Origin` on WS upgrade) (`40301`, HTTP `403`); insufficient token role, disallowed `Origin` on public `/access/requests*`, or invalid handshake `device_code` (`40302` `ACCESS_FORBIDDEN`, HTTP `403`) |
 | `40401`–`40423` | Not found: session/agent (`40401`), prompt (`40402`), interaction (`40404`), task (`40406`), file (`40407`), MCP server (`40408`), fs path (`40409`), workspace (`40410`), fs permission (`40411`), provider (`40412`), model (`40413`), skill (`40415`), catalog (`40417`), capability (`40418`), plugin (`40419`), environment (`40420`), turn (`40421`), access request (`40422`), access principal (`40423`) |
 | `40901` / `40902` | Session or agent busy (`40901`); interaction already ended (`40902`) |
 | `40906`–`40921` | Path is directory (`40906`), binary file (`40907`), git unavailable (`40908`), compaction unable (`40910`), undo unavailable (`40911`), skill not activatable (`40912`), goal conflict (`40913`–`40918`, `40920`), path exists (`40919`), provider exists (`40921`) |
@@ -169,7 +169,8 @@ HTTP envelopes and WebSocket `response` frames share the same `code` table:
 
 ### Pagination styles
 
-- **`GET /api/v1/sessions` & `POST /api/v1/search`**: Opaque `next_page_token` bound to query filters (changing filters returns `40922`). `GET /api/v1/sessions` also accepts 1-based `page` or flat-view `before_id` / `after_id` (mutually exclusive).
+- **`GET /api/v1/sessions`**: Returns `next_page_token` bound to query filters (changing filters returns `40922`); also accepts 1-based `page` or flat-view `before_id` / `after_id` (mutually exclusive).
+- **`POST /api/v1/search`**: Returns `page_token` (pass back as body `page_token`; malformed or filter-mismatched tokens return `40001`).
 - **`GET /api/v1/sessions/{session_id}/agents/{agent_id}/turns`**: Pass the earliest loaded turn's `ordinal` as `before_ordinal` (with `page_size`, default 20, max 100) to page backward through conversation history.
 
 ---
@@ -199,15 +200,22 @@ const ws = new WebSocket(ws_url, [`kimi-code.bearer.${token}`]);
 await new Promise((resolve) => ws.addEventListener('open', resolve, { once: true }));
 
 let promptConsumed = false;
+let mainStatus = 'idle';
 const assistantItemIds = new Set();
 const done = new Promise((resolve, reject) => {
+  const maybeFinish = () => {
+    if (promptConsumed && mainStatus === 'idle') {
+      process.stdout.write('\n');
+      resolve();
+    }
+  };
   ws.addEventListener('message', async ({ data }) => {
     const frame = JSON.parse(data);
     if (frame.type === 'ping') {
       ws.send(JSON.stringify({ type: 'pong' }));
       return;
     }
-    if (frame.type === 'response' && frame.request_id === 'sub-1') {
+    if (frame.type === 'turns' && !promptConsumed) {
       const submit = await fetch(`${origin}/api/v1/sessions/${session.id}/prompts`, {
         method: 'POST',
         headers,
@@ -223,6 +231,7 @@ const done = new Promise((resolve, reject) => {
     }
     if (frame.type === 'item.ended' && frame.item.type === 'user_message' && frame.item.prompt_ids?.includes('p-1')) {
       promptConsumed = true;
+      maybeFinish();
     }
     if (frame.type === 'item.started' && frame.item.type === 'assistant_message') {
       assistantItemIds.add(frame.item.item_id);
@@ -231,9 +240,9 @@ const done = new Promise((resolve, reject) => {
     if (frame.type === 'item.delta' && frame.field === 'text' && assistantItemIds.has(frame.item_id)) {
       process.stdout.write(frame.delta);
     }
-    if (frame.type === 'agent' && frame.agent_id === 'main' && frame.status === 'idle' && promptConsumed) {
-      process.stdout.write('\n');
-      resolve();
+    if (frame.type === 'agent' && frame.agent_id === 'main') {
+      mainStatus = frame.status;
+      maybeFinish();
     }
   });
 });
@@ -315,7 +324,7 @@ S {"type": "item.updated", "event_created_at": "2026-11-17T04:00:01.400Z", "sess
 S {"type": "item.ended", "event_created_at": "2026-11-17T04:00:01.450Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "item": {"item_id": "call_1", "type": "tool_call", "step_index": 1, "status": "ended", "outcome": "completed", "created_at": "2026-11-17T04:00:01.300Z", "name": "Read", "stage": "executing", "input": {"path": "README.md"}, "output": "1\t# App", "started_at": "2026-11-17T04:00:01.300Z", "ended_at": "2026-11-17T04:00:01.450Z"}}
 S {"type": "turn.updated", "event_created_at": "2026-11-17T04:00:01.450Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "step": {"index": 1, "outcome": "completed", "finish_reason": "tool_use", "started_at": "2026-11-17T04:00:01.100Z", "ended_at": "2026-11-17T04:00:01.450Z"}}
 S {"type": "item.started", "event_created_at": "2026-11-17T04:00:01.700Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "item": {"item_id": "a_1", "type": "assistant_message", "step_index": 2, "status": "running", "created_at": "2026-11-17T04:00:01.700Z", "text": "Done — "}}
-S {"type": "item.delta", "event_created_at": "2026-11-17T04:00:01.750Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "item_id": "a_1", "field": "text", "delta": "README.md defines # App."}}
+S {"type": "item.delta", "event_created_at": "2026-11-17T04:00:01.750Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "item_id": "a_1", "field": "text", "delta": "README.md defines # App."}
 S {"type": "item.ended", "event_created_at": "2026-11-17T04:00:01.800Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "item": {"item_id": "a_1", "type": "assistant_message", "step_index": 2, "status": "ended", "outcome": "completed", "created_at": "2026-11-17T04:00:01.700Z", "text": "Done — README.md defines # App."}}
 S {"type": "turn.updated", "event_created_at": "2026-11-17T04:00:01.800Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "step": {"index": 2, "outcome": "completed", "finish_reason": "end_turn", "started_at": "2026-11-17T04:00:01.500Z", "ended_at": "2026-11-17T04:00:01.800Z"}}
 S {"type": "turn.ended", "event_created_at": "2026-11-17T04:00:01.800Z", "session_id": "s1", "agent_id": "main", "turn": {"turn_id": "t_1", "ordinal": 0, "turn_number": 0, "kind": "agent", "status": "ended", "outcome": "completed", "started_at": "2026-11-17T04:00:01.000Z", "ended_at": "2026-11-17T04:00:01.800Z", "duration_ms": 800, "steps": [{"index": 1, "outcome": "completed", "finish_reason": "tool_use", "started_at": "2026-11-17T04:00:01.100Z", "ended_at": "2026-11-17T04:00:01.450Z"}, {"index": 2, "outcome": "completed", "finish_reason": "end_turn", "started_at": "2026-11-17T04:00:01.500Z", "ended_at": "2026-11-17T04:00:01.800Z"}]}}
@@ -352,7 +361,7 @@ Maintain turns per `(session_id, agent_id)` sorted by `ordinal`, and reduce fram
 
 ### 4. Prompts, `/steer` cross-turn behavior, and completion criteria
 
-- **Submitting (`/prompts`) & prompt-queue synchronization**: Starts immediately (`status: "running"`) when idle, or enters the queue (`status: "queued"`) when busy. Always pass a client-generated `prompt_id` (resending the same `prompt_id` + body is idempotent; reusing `prompt_id` with different content returns `40927`). There is no dedicated WebSocket frame for queue state changes: clients rendering a prompt queue should refresh `GET /api/v1/sessions/{session_id}/prompts` after queue mutations (`:abort`, `prompts:steer`, or queued submission) and remove entries locally as soon as their `prompt_id` appears in an emitted `user_message.prompt_ids`.
+- **Submitting (`/prompts`) & prompt-queue synchronization**: Starts immediately (`status: "running"`) when idle, or enters the queue (`status: "queued"`) when busy. Always pass a client-generated `prompt_id` (deduplicated in-memory for up to 256 settled attempts per session within the current server process; resending the same `prompt_id` + body within that window is idempotent, reusing `prompt_id` with different content returns `40927`, and deduplication does not persist across server restarts). Note that setting fields on a prompt (`model`, `thinking`, `permission_mode`, `plan_mode`, `swarm_mode`, `disabled_tools`) mutates the target agent/session settings persistently for subsequent turns rather than scoping to a single turn. There is no dedicated WebSocket frame for queue state changes: clients rendering a prompt queue should refresh `GET /api/v1/sessions/{session_id}/prompts` after queue mutations (`:abort`, `prompts:steer`, or queued submission) and remove entries locally as soon as their `prompt_id` appears in an emitted `user_message.prompt_ids`.
 - **Real runtime behavior of `/steer` and `/prompts:steer`**:
   1. **Stream interruption & continuation `Turn`**: When a steer arrives while the model is streaming, the loop immediately interrupts the in-flight model step (`step.outcome = "interrupted"`). Depending on the step boundary, the engine either injects the message into the current turn (`placement: "steer"`) **or** finishes the current turn and immediately starts a **new continuation `Turn` (with a brand-new `turn_id`)** carrying your steered message as `placement: "opener"`.
   2. **Task-chain completion rule**: Orchestrators must **not** stop waiting on `turn.ended` of the initial `turn_id` alone. Treat work for a target agent (`"main"` by default, or the `agent_id` passed to `/prompts` for a side-chat) as finished only when: (a) all submitted `prompt_id`s for that agent have appeared in `user_message.prompt_ids`, **and** (b) that target agent's `agent` frame reports `status: "idle"` (`compacting: false`). (`turn.ended` is guaranteed to arrive before `agent` `status: "idle"`).
@@ -393,7 +402,10 @@ C {"type": "task.stop", "request_id": "s1-stop", "session_id": "s1", "agent_id":
 S {"type": "response", "request_id": "s1-stop", "code": 0, "task": {"task_id": "bash-k3f9", "kind": "shell", "status": "ended", "outcome": "killed", "detached": true}}
 ```
 
-- **UTF-8 byte offsets in `task.output`**: `task.output` carries `{ session_id, agent_id, task_id, offset, text }` where `offset` is a **UTF-8 byte offset** (not JS string `.length`). Maintain `endOffset = offset + Buffer.byteLength(text, 'utf8')`. When re-watching with `since_offset: endOffset`, append `text` if `chunk.offset === endOffset`, otherwise replace your buffer starting at `chunk.offset`.
+- **Task list & output (`task.list`, `task`, `task.output`)**:
+  - `task.list` is a full replacement snapshot of running tasks for `(session_id, agent_id)` (discard local running entries absent from the snapshot); each incremental `task` frame upserts by `task_id` (a `task` frame with `status: "ended"` is the final update for that task).
+  - `task.output` carries `{ session_id, agent_id, task_id, offset, text }` where `offset` is a **UTF-8 byte offset** (not JS string `.length`). Maintain `endOffset = offset + Buffer.byteLength(text, 'utf8')`. When re-watching with `since_offset: endOffset`, append `text` if `chunk.offset === endOffset`, otherwise replace your buffer starting at `chunk.offset`.
+  - Task command error codes: `40001` (malformed frame), `40302` (`viewer` calling `task.stop`/`task.background`), `40401` (session not found), `40406` (agent/task not found), `40933` (task not detachable), `50003` (persisted task output unreadable), `50001` (internal error).
 - **Reconnection**: Subscriptions and `task.watch` streams are connection-scoped. After reconnecting: (1) resend `subscribe` and replace local session state from the fresh snapshots, (2) resend `task.watch` with `since_offset`, and (3) re-fetch REST lists (`GET /api/v1/sessions`, etc.).
 - **Global events & archive/restore lifecycle**: Sent flat to all connections without subscription: `session` (`change`: `created`/`updated`/`archived`/`restored`/`deleted`), `workspace` (`change`), `config`, `invalidated` (`kind`: `models`/`plugins` → refetch REST endpoint), `event.capability.changed`, and `event.access.request` (`owner` connections only). Note that archiving or deleting a session evicts its server-side subscriptions — if an archived session is later restored (`change: "restored"`), send `subscribe` again to resume receiving its frames. Changes made on disk by external CLI processes reconcile every ~60 s without WS broadcasts; dashboards should poll `GET /api/v1/sessions` at low frequency (~60 s or on focus).
 
@@ -452,7 +464,7 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | `POST /api/v1/sessions/{session_id}/rating` | `operator` | `baseline` | Evaluate or submit session feedback survey |
 | `GET /api/v1/sessions/{session_id}/agents/{agent_id}/turns` | `viewer` | `baseline` | Paginate historical `Turn` objects backward via `before_ordinal` |
 | `GET /api/v1/sessions/{session_id}/prompts` | `viewer` | `baseline` | Read active and queued prompts for `main` |
-| `POST /api/v1/sessions/{session_id}/prompts` | `operator` | `baseline` | Submit user prompt (`prompt_id`, `content`, `agent_id?`, per-turn overrides, `skills?`) |
+| `POST /api/v1/sessions/{session_id}/prompts` | `operator` | `baseline` | Submit user prompt (`prompt_id`, `content`, `agent_id?`, persistent agent setting updates, `skills?`) |
 | `POST /api/v1/sessions/{session_id}/steer` | `operator` | `baseline` | Directly steer a prompt into a running turn (blocks until injected) |
 | `POST /api/v1/sessions/{session_id}/prompts:steer` | `operator` | `baseline` | Convert queued `prompt_ids` into mid-turn steers |
 | `POST /api/v1/sessions/{session_id}/prompts/{prompt_id}:abort` | `operator` | `baseline` | Withdraw a queued prompt before execution |
@@ -472,7 +484,7 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | `GET /api/v1/sessions/{session_id}/fs/{path}:download` | `viewer` | `fs_query` | Download file inside session workspace (`Range`/`ETag`) |
 | `POST /api/v1/workspace/fs:list` / `:search` / `:suggest` | `operator` | `fs_query` | Workspace-scoped fs queries without a session (`operator` restricted to registered `workspace_id`; `owner` may also pass an absolute root) |
 | `GET /api/v1/fs:browse` / `:home` / `:content` & `POST /api/v1/fs:mkdir` / `:suggest` | `owner` | `fs_query` | Host-wide folder picker and arbitrary host file reader (`owner` only) |
-| `POST /api/v1/search` | `operator` | `baseline` | Full-text search across session messages |
+| `POST /api/v1/search` | `viewer` | `baseline` | Full-text search across session messages |
 | `GET /api/v1/workspaces` & `GET /api/v1/workspaces/{id}/trust` & `/skills` | `viewer` | `baseline` | List registered workspaces, workspace trust status, and workspace skills |
 | `POST` / `PATCH` / `DELETE /api/v1/workspaces*` & `GET .../project-config-dirs` | `owner` | `baseline` | Register, rename, delete, set primary dir, or change trust of workspaces (`owner` only) |
 

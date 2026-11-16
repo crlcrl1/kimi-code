@@ -220,7 +220,7 @@ const config = withMermaid(defineConfig({
       const target = `${base}${locale}/guides/kap.html`
       const refDir = resolve(outDir, locale, 'reference')
       mkdirSync(refDir, { recursive: true })
-      const html = `<!DOCTYPE html><html lang="${locale}"><head><meta charset="utf-8"><title>Redirecting…</title><link rel="canonical" href="${target}"><meta http-equiv="refresh" content="0; url=${target}"><script>location.replace(${JSON.stringify(target)})</script></head><body><p>Redirecting to <a href="${target}">${target}</a>…</p></body></html>\n`
+      const html = `<!DOCTYPE html><html lang="${locale}"><head><meta charset="utf-8"><title>Redirecting…</title><link rel="canonical" href="${target}"><meta http-equiv="refresh" content="0; url=${target}"><script>location.replace(${JSON.stringify(target)} + (location.hash || ''))</script></head><body><p>Redirecting to <a href="${target}">${target}</a>…</p></body></html>\n`
       for (const slug of legacyPages) {
         writeFileSync(resolve(refDir, `${slug}.html`), html, 'utf8')
       }

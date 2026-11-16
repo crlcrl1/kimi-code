@@ -68,15 +68,22 @@ const ws = new WebSocket(ws_url, [`kimi-code.bearer.${token}`]);
 await new Promise((resolve) => ws.addEventListener('open', resolve, { once: true }));
 
 let promptConsumed = false;
+let mainStatus = 'idle';
 const assistantItemIds = new Set();
 const done = new Promise((resolve, reject) => {
+  const maybeFinish = () => {
+    if (promptConsumed && mainStatus === 'idle') {
+      process.stdout.write('\n');
+      resolve();
+    }
+  };
   ws.addEventListener('message', async ({ data }) => {
     const frame = JSON.parse(data);
     if (frame.type === 'ping') {
       ws.send(JSON.stringify({ type: 'pong' }));
       return;
     }
-    if (frame.type === 'response' && frame.request_id === 'sub-1') {
+    if (frame.type === 'turns' && !promptConsumed) {
       const submit = await fetch(`${origin}/api/v1/sessions/${session.id}/prompts`, {
         method: 'POST',
         headers,
@@ -92,6 +99,7 @@ const done = new Promise((resolve, reject) => {
     }
     if (frame.type === 'item.ended' && frame.item.type === 'user_message' && frame.item.prompt_ids?.includes('p-1')) {
       promptConsumed = true;
+      maybeFinish();
     }
     if (frame.type === 'item.started' && frame.item.type === 'assistant_message') {
       assistantItemIds.add(frame.item.item_id);
@@ -100,9 +108,9 @@ const done = new Promise((resolve, reject) => {
     if (frame.type === 'item.delta' && frame.field === 'text' && assistantItemIds.has(frame.item_id)) {
       process.stdout.write(frame.delta);
     }
-    if (frame.type === 'agent' && frame.agent_id === 'main' && frame.status === 'idle' && promptConsumed) {
-      process.stdout.write('\n');
-      resolve();
+    if (frame.type === 'agent' && frame.agent_id === 'main') {
+      mainStatus = frame.status;
+      maybeFinish();
     }
   });
 });
