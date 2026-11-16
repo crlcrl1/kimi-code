@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { mkdir, open, readdir, readFile, rename, rm, stat, unlink } from 'node:fs/promises';
+import { link, mkdir, open, readdir, readFile, rename, rm, stat, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { ulid } from 'ulid';
@@ -156,55 +156,84 @@ function isProcessAlive(pid: number): boolean {
 
 async function withFileLock<T>(targetPath: string, fn: () => Promise<T>): Promise<T> {
   const lockPath = `${targetPath}.lock`;
-  await mkdir(dirname(lockPath), { recursive: true, mode: 0o700 });
+  const dir = dirname(lockPath);
+  await mkdir(dir, { recursive: true, mode: 0o700 });
   const lockToken = `${process.pid}:${ulid()}`;
+  const stagePath = `${lockPath}.stage.${process.pid}.${ulid()}`;
+  const stageFh = await open(stagePath, 'wx', 0o600);
+  try {
+    await stageFh.writeFile(lockToken);
+  } finally {
+    await stageFh.close();
+  }
+  let acquired = false;
   const deadline = Date.now() + 5_000;
-  for (;;) {
-    try {
-      const fh = await open(lockPath, 'wx', 0o600);
+  try {
+    for (;;) {
       try {
-        await fh.writeFile(lockToken);
-      } finally {
-        await fh.close();
-      }
-      break;
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code !== 'EEXIST') throw error;
-      try {
-        const raw = (await readFile(lockPath, 'utf8')).trim();
-        const holderPid = Number.parseInt(raw.split(':', 1)[0] ?? '', 10);
-        if (Number.isFinite(holderPid) && !isProcessAlive(holderPid)) {
-          const reclaimTmp = `${lockPath}.reclaim.${process.pid}.${ulid()}`;
-          await rename(lockPath, reclaimTmp)
-            .then(async () => {
-              const verify = (await readFile(reclaimTmp, 'utf8').catch(() => '')).trim();
-              if (verify === raw) {
-                await rm(reclaimTmp, { force: true }).catch(() => {});
-              } else {
-                await rename(reclaimTmp, lockPath).catch(async () => {
+        await link(stagePath, lockPath);
+        acquired = true;
+        break;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === 'EXDEV' || code === 'EPERM' || code === 'ENOSYS') {
+          try {
+            const fh = await open(lockPath, 'wx', 0o600);
+            try {
+              await fh.writeFile(lockToken);
+            } finally {
+              await fh.close();
+            }
+            acquired = true;
+            break;
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+          }
+        } else if (code !== 'EEXIST') {
+          throw error;
+        }
+        try {
+          const st = await stat(lockPath);
+          const raw = (await readFile(lockPath, 'utf8')).trim();
+          const holderPid = Number.parseInt(raw.split(':', 1)[0] ?? '', 10);
+          const malformedStale = !Number.isFinite(holderPid) && Date.now() - st.mtimeMs > 5_000;
+          const deadHolder = Number.isFinite(holderPid) && !isProcessAlive(holderPid);
+          if (deadHolder || malformedStale) {
+            const reclaimTmp = `${lockPath}.reclaim.${process.pid}.${ulid()}`;
+            await rename(lockPath, reclaimTmp)
+              .then(async () => {
+                const verify = (await readFile(reclaimTmp, 'utf8').catch(() => '')).trim();
+                if (verify === raw) {
                   await rm(reclaimTmp, { force: true }).catch(() => {});
-                });
-              }
-            })
-            .catch(() => {});
+                } else {
+                  await rename(reclaimTmp, lockPath).catch(async () => {
+                    await rm(reclaimTmp, { force: true }).catch(() => {});
+                  });
+                }
+              })
+              .catch(() => {});
+            continue;
+          }
+        } catch {
           continue;
         }
-      } catch {
-        continue;
+        if (Date.now() >= deadline) {
+          throw new Error(`Timed out acquiring lock for ${targetPath}`, { cause: error });
+        }
+        await new Promise((r) => setTimeout(r, 15));
       }
-      if (Date.now() >= deadline) {
-        throw new Error(`Timed out acquiring lock for ${targetPath}`, { cause: error });
-      }
-      await new Promise((r) => setTimeout(r, 15));
     }
+  } finally {
+    await rm(stagePath, { force: true }).catch(() => {});
   }
   try {
     return await fn();
   } finally {
-    const current = (await readFile(lockPath, 'utf8').catch(() => '')).trim();
-    if (current === lockToken) {
-      await unlink(lockPath).catch(() => {});
+    if (acquired) {
+      const current = (await readFile(lockPath, 'utf8').catch(() => '')).trim();
+      if (current === lockToken) {
+        await unlink(lockPath).catch(() => {});
+      }
     }
   }
 }

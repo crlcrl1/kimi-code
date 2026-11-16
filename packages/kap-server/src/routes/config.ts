@@ -93,6 +93,7 @@ export function registerConfigRoutes(app: ConfigRouteHost, core: Scope): void {
 export function toConfigResponse(resolved: Record<string, unknown>): ConfigResponse {
   const wire: Record<string, unknown> = {};
   for (const [domain, value] of Object.entries(resolved)) {
+    if (domain === 'raw') continue;
     wire[camelToSnake(domain)] =
       domain === 'providers'
         ? toProviderResponses(value)
@@ -100,7 +101,9 @@ export function toConfigResponse(resolved: Record<string, unknown>): ConfigRespo
           ? toModelResponses(value)
           : domain === 'services'
             ? toServiceResponses(value)
-            : value;
+            : domain === 'environments'
+              ? toEnvironmentResponses(value)
+              : value;
   }
   const defaultPermissionMode = resolved['defaultPermissionMode'];
   if (typeof defaultPermissionMode === 'string') {
@@ -185,6 +188,27 @@ function toServiceResponses(value: unknown): Record<string, unknown> {
       ...rest,
       has_api_key: hasModelCredential(raw as ModelLike),
       custom_header_keys: isPlainObject(customHeaders) ? Object.keys(customHeaders) : undefined,
+    };
+  }
+  return result;
+}
+
+function toEnvironmentResponses(value: unknown): unknown {
+  if (!isPlainObject(value)) return value;
+  const result: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (!isPlainObject(entry)) {
+      result[key] = entry;
+      continue;
+    }
+    const { env, headers, ...rest } = entry as {
+      env?: unknown;
+      headers?: unknown;
+    } & Record<string, unknown>;
+    result[key] = {
+      ...rest,
+      env_keys: isPlainObject(env) ? Object.keys(env) : undefined,
+      header_keys: isPlainObject(headers) ? Object.keys(headers) : undefined,
     };
   }
   return result;
