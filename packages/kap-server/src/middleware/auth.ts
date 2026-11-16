@@ -72,7 +72,7 @@ function decodeRequestPath(rawUrl: string): string | null {
 function isUnauthenticatedAccessRoute(method: string, path: string): boolean {
   if (method !== 'POST') return false;
   if (path === '/api/v1/access/requests') return true;
-  return /^\/api\/v1\/access\/requests\/[^/]+:exchange$/.test(path);
+  return /^\/api\/v1\/access\/requests\/areq_[0-9A-HJKMNP-TV-Z]{26}:exchange$/.test(path);
 }
 
 export function defaultIsBypassed(req: FastifyRequest): boolean {

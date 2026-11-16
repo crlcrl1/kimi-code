@@ -20,10 +20,11 @@ import {
   resolveAccessRequestResponseSchema,
   revokeAccessPrincipalResponseSchema,
 } from '../protocol/rest-access';
-import type {
-  AccessHandshakeManager,
-  AccessRequestView,
-  AccessTokenStore,
+import {
+  isValidAccessRequestId,
+  type AccessHandshakeManager,
+  type AccessRequestView,
+  type AccessTokenStore,
 } from '../services/auth/accessTokenStore';
 import { parseActionSuffix } from './action-suffix';
 
@@ -291,6 +292,16 @@ export function registerAccessRoutes(
             ? parsedTail.reason
             : `unsupported action: ${req.params.tail}`;
         r.send(errEnvelope(ErrorCode.VALIDATION_FAILED, message, req.id));
+        return;
+      }
+      if (!isValidAccessRequestId(parsedTail.id)) {
+        r.send(
+          errEnvelope(
+            ErrorCode.ACCESS_REQUEST_NOT_FOUND,
+            `access request not found: ${parsedTail.id}`,
+            req.id,
+          ),
+        );
         return;
       }
 

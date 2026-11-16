@@ -1,5 +1,4 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { statSync } from 'node:fs';
 import { mkdir, open, readdir, readFile, rename, rm, stat, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
@@ -380,15 +379,6 @@ export function createAccessTokenStore(opts: AccessTokenStoreOptions): AccessTok
     }
   };
 
-  const updateCacheAfterWrite = (records: AccessTokenRecord[]): void => {
-    try {
-      const st = statSync(filePath);
-      cache = { mtimeMs: st.mtimeMs, ino: st.ino, records };
-    } catch {
-      cache = { mtimeMs: -1, ino: -1, records };
-    }
-  };
-
   const maybeTouchLastUsed = (principalId: string): void => {
     const nowMs = Date.now();
     const prevMs = lastUsedFlushedMs.get(principalId) ?? 0;
@@ -403,8 +393,8 @@ export function createAccessTokenStore(opts: AccessTokenStoreOptions): AccessTok
         const next = [...current];
         next[idx] = { ...current[idx]!, last_used_at: nowIso };
         await writeAccessTokenRecords(filePath, next);
-        updateCacheAfterWrite(next);
       });
+      cache = { mtimeMs: -1, ino: -1, records: cache.records };
     }).catch(() => {});
   };
 
@@ -444,8 +434,8 @@ export function createAccessTokenStore(opts: AccessTokenStoreOptions): AccessTok
     createToken(input) {
       return enqueueWrite(async () => {
         const result = await createPersistedAccessToken(opts.homeDir, input);
-        const records = await readAccessTokenRecords(filePath);
-        updateCacheAfterWrite(records);
+        cache = { mtimeMs: -1, ino: -1, records: cache.records };
+        await refreshIfNeeded();
         return result;
       });
     },
@@ -457,12 +447,10 @@ export function createAccessTokenStore(opts: AccessTokenStoreOptions): AccessTok
 
     revokePrincipal(principalId: string) {
       return enqueueWrite(async () => {
-        const prev = await readAccessTokenRecords(filePath);
         const revoked = await revokePersistedAccessPrincipal(opts.homeDir, principalId);
         if (revoked !== undefined) {
-          const next = await readAccessTokenRecords(filePath);
-          updateCacheAfterWrite(next);
-          notifyNewlyRevoked(prev, next);
+          cache = { mtimeMs: -1, ino: -1, records: cache.records };
+          await refreshIfNeeded();
         }
         return revoked;
       });
@@ -531,6 +519,12 @@ function toAccessRequestView(
     expires_at: rec.expires_at,
     resolved_at: rec.resolved_at,
   };
+}
+
+const ACCESS_REQUEST_ID_RE = /^areq_[0-9A-HJKMNP-TV-Z]{26}$/;
+
+export function isValidAccessRequestId(requestId: string): boolean {
+  return ACCESS_REQUEST_ID_RE.test(requestId);
 }
 
 function requestFilePath(homeDir: string, requestId: string): string {
@@ -776,6 +770,9 @@ export function createAccessHandshakeManager(
     },
 
     resolveRequest(requestId, decision) {
+      if (!isValidAccessRequestId(requestId)) {
+        return Promise.resolve({ ok: false as const, reason: 'not_found' as const });
+      }
       return enqueue(() =>
         withFileLock(requestFilePath(opts.homeDir, requestId), async () => {
           const rec = await readRequestRecord(requestFilePath(opts.homeDir, requestId));
@@ -822,6 +819,9 @@ export function createAccessHandshakeManager(
     },
 
     exchangeRequest(requestId, deviceCode) {
+      if (!isValidAccessRequestId(requestId)) {
+        return Promise.resolve({ ok: false as const, reason: 'not_found' as const });
+      }
       return enqueue(() =>
         withFileLock(requestFilePath(opts.homeDir, requestId), async () => {
           const rec = await readRequestRecord(requestFilePath(opts.homeDir, requestId));

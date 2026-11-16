@@ -25,6 +25,7 @@ import {
 import { z } from 'zod';
 
 import { errEnvelope, okEnvelope } from '../envelope';
+import { getRequestPrincipal } from '../middleware/auth';
 import { defineRoute } from '../middleware/defineRoute';
 import { ErrorCode } from '../protocol/error-codes';
 import {
@@ -600,12 +601,15 @@ export function registerModelCatalogRoutes(app: ModelCatalogRouteHost, core: Sco
       try {
         const { provider_id } = req.params;
         const provider = await (await loadCatalog(core)).getProvider(provider_id);
-        const config = await loadConfig(core);
-        const stored = config.inspect<ProvidersSection>(PROVIDERS_SECTION).userValue?.[provider_id];
+        const isOwner = getRequestPrincipal(req).role === 'owner';
+        const config = isOwner ? await loadConfig(core) : undefined;
+        const stored = config?.inspect<ProvidersSection>(PROVIDERS_SECTION).userValue?.[provider_id];
         const apiKey = stored?.apiKey;
         reply.send(
           okEnvelope(
-            apiKey !== undefined && apiKey !== '' ? { ...provider, api_key: apiKey } : provider,
+            isOwner && apiKey !== undefined && apiKey !== ''
+              ? { ...provider, api_key: apiKey }
+              : provider,
             req.id,
           ),
         );
