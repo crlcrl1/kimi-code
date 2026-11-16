@@ -2,6 +2,7 @@ import { IConfigService, type Scope } from '@moonshot-ai/agent-core-v2';
 
 import { errEnvelope, okEnvelope } from '../envelope';
 import { requestLog } from '../lib/requestLog';
+import { getRequestPrincipal } from '../middleware/auth';
 import { defineRoute } from '../middleware/defineRoute';
 import { ErrorCode } from '../protocol/error-codes';
 import { configResponseSchema, patchConfigRequestSchema } from '../protocol/rest-config';
@@ -41,7 +42,9 @@ export function registerConfigRoutes(app: ConfigRouteHost, core: Scope): void {
     async (req, reply) => {
       const config = core.accessor.get(IConfigService);
       await config.ready;
-      reply.send(okEnvelope(toConfigResponse(config.getAll()), req.id));
+      const redact = getRequestPrincipal(req).role !== 'owner';
+      const base = toConfigResponse(config.getAll());
+      reply.send(okEnvelope(redact ? redactConfigForNonOwner(base) : base, req.id));
     },
   );
   app.get(getRoute.path, getRoute.options, getRoute.handler as Parameters<ConfigRouteHost['get']>[2]);
@@ -93,7 +96,6 @@ export function registerConfigRoutes(app: ConfigRouteHost, core: Scope): void {
 export function toConfigResponse(resolved: Record<string, unknown>): ConfigResponse {
   const wire: Record<string, unknown> = {};
   for (const [domain, value] of Object.entries(resolved)) {
-    if (domain === 'raw') continue;
     wire[camelToSnake(domain)] =
       domain === 'providers'
         ? toProviderResponses(value)
@@ -101,9 +103,7 @@ export function toConfigResponse(resolved: Record<string, unknown>): ConfigRespo
           ? toModelResponses(value)
           : domain === 'services'
             ? toServiceResponses(value)
-            : domain === 'environments'
-              ? toEnvironmentResponses(value)
-              : value;
+            : value;
   }
   const defaultPermissionMode = resolved['defaultPermissionMode'];
   if (typeof defaultPermissionMode === 'string') {
@@ -113,6 +113,19 @@ export function toConfigResponse(resolved: Record<string, unknown>): ConfigRespo
     wire['providers'] = {};
   }
   return wire as ConfigResponse;
+}
+
+export function redactConfigForNonOwner(config: ConfigResponse): ConfigResponse {
+  const { raw: _raw, environments, ...rest } = config as ConfigResponse & {
+    environments?: unknown;
+  };
+  if (environments === undefined) {
+    return rest as ConfigResponse;
+  }
+  return {
+    ...rest,
+    environments: toEnvironmentResponses(environments),
+  } as ConfigResponse;
 }
 
 interface ProviderLike {

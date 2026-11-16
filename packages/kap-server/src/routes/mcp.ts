@@ -625,9 +625,16 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     },
     async (req, reply) => {
       try {
+        const isOwner = getRequestPrincipal(req).role === 'owner';
+        if (!isOwner && req.query.verify === 'true') {
+          (reply as unknown as { code(s: number): { send(p: unknown): unknown } })
+            .code(403)
+            .send(errEnvelope(ErrorCode.ACCESS_FORBIDDEN, 'Insufficient token permissions', req.id));
+          return;
+        }
         const statuses = await management().listAuthStatuses({
           cwd: req.query.cwd,
-          verify: req.query.verify === undefined ? undefined : req.query.verify === 'true',
+          verify: !isOwner ? false : req.query.verify === undefined ? undefined : req.query.verify === 'true',
         });
         reply.send(okEnvelope(statuses.map(toAuthStatusWire), req.id));
       } catch (error) {

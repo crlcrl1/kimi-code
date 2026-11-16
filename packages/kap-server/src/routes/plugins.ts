@@ -218,7 +218,7 @@ export function registerPluginsRoutes(
     {
       method: 'GET',
       path: '/plugins/marketplace',
-      minRole: 'viewer',
+      minRole: 'owner',
       success: { data: pluginMarketplaceResponseSchema },
       errors: {},
       description: 'List the plugin marketplace catalog merged with live install state',

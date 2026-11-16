@@ -77,7 +77,9 @@ export async function registerApiV1Routes(
 ): Promise<void> {
   await app.register(
     async (apiV1) => {
-      registerHealthRoute(apiV1);
+      const accessTokensEnabled =
+        opts.access === undefined || opts.access.handshakeManager !== undefined;
+      registerHealthRoute(apiV1, { accessTokensEnabled });
 
       if (opts.debugEndpoints === true) {
         registerDebugRoutes(apiV1 as unknown as Parameters<typeof registerDebugRoutes>[0], core);
@@ -88,7 +90,7 @@ export async function registerApiV1Routes(
         serverId: opts.serverId ?? ulid(),
         startedAt: new Date().toISOString(),
         dangerousBypassAuth: opts.dangerousBypassAuth === true,
-        accessTokensEnabled: opts.access === undefined || opts.access.handshakeManager !== undefined,
+        accessTokensEnabled,
         webTitle: opts.webTitle,
         getExperimentalFlags: async () => {
           await core.accessor.get(IConfigService).ready;
@@ -201,12 +203,15 @@ export async function registerApiV1Routes(
   );
 }
 
-function registerHealthRoute(apiV1: ApiV1RouteHost): void {
+function registerHealthRoute(
+  apiV1: ApiV1RouteHost,
+  opts: { readonly accessTokensEnabled: boolean },
+): void {
   apiV1.get(
     '/healthz',
     {
       schema: {
-        description: 'Health check',
+        description: 'Health check and pre-auth bootstrap capability discovery',
         response: {
           200: {
             type: 'object',
@@ -215,7 +220,11 @@ function registerHealthRoute(apiV1: ApiV1RouteHost): void {
               msg: { type: 'string' },
               data: {
                 type: 'object',
-                properties: { ok: { type: 'boolean' } },
+                properties: {
+                  ok: { type: 'boolean' },
+                  kimi_agent_protocol_version: { type: 'string' },
+                  access_tokens: { type: 'boolean' },
+                },
               },
               request_id: { type: 'string' },
             },
@@ -224,7 +233,16 @@ function registerHealthRoute(apiV1: ApiV1RouteHost): void {
       },
     },
     async (req, reply) => {
-      return reply.send(okEnvelope({ ok: true }, req.id));
+      return reply.send(
+        okEnvelope(
+          {
+            ok: true,
+            kimi_agent_protocol_version: '0.1.0',
+            access_tokens: opts.accessTokensEnabled,
+          },
+          req.id,
+        ),
+      );
     },
   );
 }

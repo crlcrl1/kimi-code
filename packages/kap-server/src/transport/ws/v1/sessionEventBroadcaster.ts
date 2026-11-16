@@ -57,7 +57,7 @@ import {
 import { toWireQuestion } from '../../../protocol/question-wire';
 import type { AgentFeedMessage } from '../../../protocol/ws-agent';
 import type { TaskEventMessage, TaskListMessage } from '../../../protocol/ws-task';
-import { toConfigResponse } from '../../../routes/config';
+import { redactConfigForNonOwner, toConfigResponse } from '../../../routes/config';
 import { resolveSessionFacts, toWireSession, type SessionFacts, type SessionWireFields } from '../../../routes/sessions';
 import { toWireWorkspace } from '../../../routes/workspaces';
 import type { ConversationEvent, ConversationFeed } from '../../../services/conversation/conversationFeed';
@@ -760,15 +760,27 @@ export class SessionEventBroadcaster {
 
   private sendGlobal(event: Event): void {
     const { agentId: _agentId, sessionId: _sessionId, time, ...fields } = event;
-    const envelope = {
+    const createdAt = time !== undefined ? new Date(time).toISOString() : new Date().toISOString();
+    const ownerEnvelope = {
       ...fields,
-      event_created_at: time !== undefined ? new Date(time).toISOString() : new Date().toISOString(),
+      event_created_at: createdAt,
     } as EventEnvelope;
     const ownerOnly = event.type === 'event.access.request';
+    let redactedEnvelope: EventEnvelope | undefined;
     for (const target of this.globalTargets) {
-      if (ownerOnly && (target.role ?? 'owner') !== 'owner') continue;
+      const isOwner = (target.role ?? 'owner') === 'owner';
+      if (ownerOnly && !isOwner) continue;
+      let payload = ownerEnvelope;
+      if (!isOwner && event.type === 'config') {
+        redactedEnvelope ??= {
+          ...fields,
+          config: redactConfigForNonOwner(event.config),
+          event_created_at: createdAt,
+        } as EventEnvelope;
+        payload = redactedEnvelope;
+      }
       try {
-        target.send(envelope, 'immediate');
+        target.send(payload, 'immediate');
       } catch {
       }
     }
