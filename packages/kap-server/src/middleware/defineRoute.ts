@@ -103,7 +103,7 @@ export interface DefineRouteOptions<
   operationId?: string;
   consumes?: string[];
   hide?: boolean;
-  minRole?: AccessRole | 'public';
+  minRole: AccessRole | 'public';
 }
 
 export interface RouteDefinition<
@@ -139,9 +139,7 @@ export function defineRoute<
 ): RouteDefinition<TBody, TParams, TQuery> {
   const preHandler: unknown[] = [];
 
-  const defaultMinRole: AccessRole =
-    options.method.toUpperCase() === 'GET' ? 'viewer' : 'operator';
-  const effectiveRole = options.minRole ?? defaultMinRole;
+  const effectiveRole = options.minRole;
   if (effectiveRole !== 'public' && effectiveRole !== 'viewer') {
     preHandler.push(requireRole(effectiveRole));
   }

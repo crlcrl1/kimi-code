@@ -310,6 +310,7 @@ export function registerSessionListAndBatchRoutes(
     {
       method: 'GET',
       path: '/sessions',
+      minRole: 'viewer',
       querystring: listSessionsQuerySchema,
       success: { data: listSessionsResponseSchema },
       errors: {
@@ -607,6 +608,7 @@ export function registerSessionListAndBatchRoutes(
       {
         method: 'POST',
         path: `/sessions::${action}`,
+        minRole: 'operator',
         body: batchSessionsRequestSchema,
         success: { data: batchSessionsResponseSchema },
         errors: {

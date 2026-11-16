@@ -130,6 +130,7 @@ export interface ServerStartOptions {
   readonly insecureNoTls?: boolean;
   readonly allowRemoteShutdown?: boolean;
   readonly authTokenService?: IAuthTokenService;
+  readonly enableAccessTokens?: boolean;
   readonly disableOwnerTokenStore?: boolean;
   readonly ephemeralTokens?: readonly EphemeralTokenSpec[];
   readonly onAccessRequestPrompt?: (request: AccessRequestView) => void;
@@ -220,8 +221,10 @@ export async function startServer(opts: ServerStartOptions): Promise<RunningServ
     passwordConfigured = passwordHash !== undefined;
     authTokenService = createAuthTokenService({ tokenStore, passwordHash });
   }
+  const accessTokensPersisted = opts.enableAccessTokens !== false;
   const accessTokenStore = createAccessTokenStore({
     homeDir,
+    persist: accessTokensPersisted,
     ephemeralTokens: opts.ephemeralTokens,
     onRevoked: (principalId) => {
       connectionRegistry.closeByPrincipalId(principalId);

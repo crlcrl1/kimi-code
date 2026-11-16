@@ -76,6 +76,7 @@ export function registerWorkspacesRoutes(app: WorkspaceRouteHost, core: Scope): 
     {
       method: 'GET',
       path: '/workspaces',
+      minRole: 'viewer',
       success: { data: listWorkspacesResponseSchema },
       description: 'List registered workspaces',
       tags: ['workspaces'],
@@ -251,6 +252,7 @@ export function registerWorkspacesRoutes(app: WorkspaceRouteHost, core: Scope): 
     {
       method: 'GET',
       path: '/workspaces/{workspace_id}/trust',
+      minRole: 'viewer',
       params: workspaceIdParamSchema,
       success: { data: workspaceTrustResponseSchema },
       errors: {

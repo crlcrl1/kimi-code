@@ -218,6 +218,7 @@ export function registerPluginsRoutes(
     {
       method: 'GET',
       path: '/plugins/marketplace',
+      minRole: 'viewer',
       success: { data: pluginMarketplaceResponseSchema },
       errors: {},
       description: 'List the plugin marketplace catalog merged with live install state',
@@ -317,6 +318,7 @@ export function registerPluginsRoutes(
     {
       method: 'GET',
       path: '/plugins',
+      minRole: 'viewer',
       success: { data: listPluginsResponseSchema },
       errors: {},
       description: 'List installed plugins',
@@ -338,6 +340,7 @@ export function registerPluginsRoutes(
     {
       method: 'GET',
       path: '/plugins/{tail}',
+      minRole: 'viewer',
       params: pluginIdParamSchema,
       querystring: pluginInfoQuerySchema,
       success: { data: pluginInfoSchema },

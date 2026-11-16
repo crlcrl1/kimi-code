@@ -386,6 +386,7 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     {
       method: 'GET',
       path: '/mcp/servers',
+      minRole: 'viewer',
       querystring: serverScopedQuerySchema,
       success: { data: z.array(mcpManagedServerSchema) },
       errors: baseErrorSchemas,
@@ -412,6 +413,7 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     {
       method: 'GET',
       path: '/mcp/servers/{name}',
+      minRole: 'viewer',
       params: serverNameParamSchema,
       querystring: serverScopedQuerySchema,
       success: { data: mcpManagedServerSchema },
@@ -592,6 +594,7 @@ export function registerMcpRoutes(app: McpRouteHost, core: Scope): void {
     {
       method: 'GET',
       path: '/mcp/auth-statuses',
+      minRole: 'viewer',
       querystring: authStatusesQuerySchema,
       success: { data: z.array(mcpServerAuthStatusSchema) },
       errors: baseErrorSchemas,

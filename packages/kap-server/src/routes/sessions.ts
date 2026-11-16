@@ -139,6 +139,7 @@ export function registerSessionsRoutes(app: SessionRouteHost, core: Scope, conve
     {
       method: 'POST',
       path: '/sessions',
+      minRole: 'operator',
       body: createSessionRequestSchema,
       success: { data: sessionSchema },
       errors: {
@@ -265,6 +266,7 @@ export function registerSessionsRoutes(app: SessionRouteHost, core: Scope, conve
     {
       method: 'GET',
       path: '/sessions/{session_id}',
+      minRole: 'viewer',
       params: sessionIdParamSchema,
       success: { data: sessionSchema },
       errors: {
@@ -310,6 +312,7 @@ export function registerSessionsRoutes(app: SessionRouteHost, core: Scope, conve
     {
       method: 'POST',
       path: '/sessions/{session_id}/profile',
+      minRole: 'operator',
       params: sessionIdParamSchema,
       body: updateSessionProfileRequestSchema,
       success: { data: updateSessionProfileResponseSchema },
@@ -368,6 +371,7 @@ export function registerSessionsRoutes(app: SessionRouteHost, core: Scope, conve
     {
       method: 'POST',
       path: '/sessions/{session_id}/title/generate',
+      minRole: 'operator',
       params: sessionIdParamSchema,
       body: z.preprocess(
         (value) => (value === undefined ? {} : value),
@@ -424,6 +428,7 @@ export function registerSessionsRoutes(app: SessionRouteHost, core: Scope, conve
     {
       method: 'POST',
       path: '/sessions/{tail}',
+      minRole: 'operator',
       params: sessionActionTailParamSchema,
       body: sessionActionRequestSchema,
       success: {
@@ -478,6 +483,7 @@ export function registerSessionsRoutes(app: SessionRouteHost, core: Scope, conve
     {
       method: 'GET',
       path: '/sessions/{session_id}/warnings',
+      minRole: 'viewer',
       params: sessionIdParamSchema,
       success: { data: sessionWarningsResponseSchema },
       errors: {

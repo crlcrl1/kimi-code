@@ -33,6 +33,7 @@ export function registerConfigRoutes(app: ConfigRouteHost, core: Scope): void {
     {
       method: 'GET',
       path: '/config',
+      minRole: 'viewer',
       success: { data: configResponseSchema },
       description: 'Get the global Kimi configuration (secrets redacted)',
       tags: ['config'],

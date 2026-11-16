@@ -48,6 +48,7 @@ export function registerSessionExportRoute(
     {
       method: 'POST',
       path: '/sessions/{session_id}/export',
+      minRole: 'operator',
       params: exportSessionParamsSchema,
       body: exportSessionRequestSchema,
       rawResponse: {

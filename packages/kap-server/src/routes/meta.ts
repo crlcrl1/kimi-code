@@ -49,6 +49,7 @@ export function registerMetaRoute(app: RouteHost, opts: MetaRouteOptions): void 
     {
       method: 'GET',
       path: '/meta',
+      minRole: 'viewer',
       success: { data: metaResponseSchema },
       description: 'Get server metadata',
       tags: ['meta'],

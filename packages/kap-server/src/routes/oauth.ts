@@ -269,6 +269,7 @@ export function registerOAuthRoutes(
     {
       method: 'GET',
       path: '/oauth/usage',
+      minRole: 'viewer',
       querystring: oauthLoginQuerySchema,
       success: { data: managedUsageResultSchema },
       description: 'Get the managed account usage summary',
@@ -289,6 +290,7 @@ export function registerOAuthRoutes(
     {
       method: 'GET',
       path: '/oauth/userinfo',
+      minRole: 'viewer',
       querystring: oauthLoginQuerySchema,
       success: { data: managedUserInfoResultSchema },
       description: 'Get the managed account profile',
@@ -309,6 +311,7 @@ export function registerOAuthRoutes(
     {
       method: 'GET',
       path: '/oauth/region',
+      minRole: 'viewer',
       success: { data: oauthRegionResultSchema },
       description: 'Resolve the client region (mainland-cn/global)',
       tags: ['auth'],

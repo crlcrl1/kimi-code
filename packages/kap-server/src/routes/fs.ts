@@ -271,6 +271,7 @@ export function registerFsRoutes(app: FsRouteHost, core: Scope): void {
     {
       method: 'POST',
       path: '/sessions/{session_id}/{tail}',
+      minRole: 'operator',
       params: sessionIdAndTailParamSchema,
       errors: {
         [ErrorCode.VALIDATION_FAILED]: {},
@@ -413,6 +414,7 @@ export function registerFsRoutes(app: FsRouteHost, core: Scope): void {
     {
       method: 'POST',
       path: '/workspace/fs::list',
+      minRole: 'operator',
       body: workspaceFsListBodySchema,
       success: { data: fsListResponseSchema },
       errors: {
@@ -468,6 +470,7 @@ export function registerFsRoutes(app: FsRouteHost, core: Scope): void {
     {
       method: 'POST',
       path: '/workspace/fs::search',
+      minRole: 'operator',
       body: workspaceFsSearchBodySchema,
       success: { data: fsSearchResponseSchema },
       errors: {
@@ -521,6 +524,7 @@ export function registerFsRoutes(app: FsRouteHost, core: Scope): void {
     {
       method: 'POST',
       path: '/workspace/fs::suggest',
+      minRole: 'operator',
       body: workspaceFsSuggestBodySchema,
       success: { data: fsSuggestResponseSchema },
       errors: {
@@ -643,6 +647,7 @@ export function registerFsRoutes(app: FsRouteHost, core: Scope): void {
     {
       method: 'GET',
       path: '/sessions/{session_id}/fs/*',
+      minRole: 'viewer',
       querystring: fsDownloadQuerySchema,
       rawResponse: {
         200: { type: 'string', format: 'binary' },

@@ -149,6 +149,7 @@ export function registerModelCatalogRoutes(app: ModelCatalogRouteHost, core: Sco
     {
       method: 'GET',
       path: '/models',
+      minRole: 'viewer',
       success: { data: listModelsResponseSchema },
       description: 'List configured model aliases',
       tags: ['models'],
@@ -211,6 +212,7 @@ export function registerModelCatalogRoutes(app: ModelCatalogRouteHost, core: Sco
     {
       method: 'GET',
       path: '/providers',
+      minRole: 'viewer',
       success: { data: listProvidersResponseSchema },
       description: 'List configured providers',
       tags: ['providers'],
@@ -583,6 +585,7 @@ export function registerModelCatalogRoutes(app: ModelCatalogRouteHost, core: Sco
     {
       method: 'GET',
       path: '/providers/{provider_id}',
+      minRole: 'viewer',
       params: providerIdParamSchema,
       success: { data: getProviderResponseSchema },
       errors: {
@@ -688,6 +691,7 @@ export function registerModelCatalogRoutes(app: ModelCatalogRouteHost, core: Sco
     {
       method: 'GET',
       path: '/catalog/providers',
+      minRole: 'viewer',
       success: { data: listCatalogProvidersResponseSchema },
       errors: { [ErrorCode.CATALOG_UNAVAILABLE]: {} },
       description:
@@ -715,6 +719,7 @@ export function registerModelCatalogRoutes(app: ModelCatalogRouteHost, core: Sco
     {
       method: 'GET',
       path: '/catalog/providers/{catalog_id}',
+      minRole: 'viewer',
       params: catalogIdParamSchema,
       success: { data: getCatalogProviderResponseSchema },
       errors: {

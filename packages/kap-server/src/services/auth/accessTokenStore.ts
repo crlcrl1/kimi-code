@@ -256,6 +256,7 @@ export interface AccessTokenStore {
 
 export interface AccessTokenStoreOptions {
   readonly homeDir: string;
+  readonly persist?: boolean;
   readonly ephemeralTokens?: readonly EphemeralTokenSpec[];
   readonly onRevoked?: (principalId: string) => void;
   readonly watchIntervalMs?: number;
@@ -276,12 +277,17 @@ function timingSafeHexEqual(hexA: string, hexB: string): boolean {
 
 export function createAccessTokenStore(opts: AccessTokenStoreOptions): AccessTokenStore {
   const filePath = accessTokensPath(opts.homeDir);
-  const ephemerals: EphemeralEntry[] = (opts.ephemeralTokens ?? []).map((spec) => ({
-    id: spec.id ?? `ephem_${ulid()}`,
-    name: spec.name,
-    role: spec.role,
-    hashBuf: Buffer.from(hashAccessToken(spec.token), 'utf8'),
-  }));
+  const ephemerals: EphemeralEntry[] = (opts.ephemeralTokens ?? []).map((spec) => {
+    if (!spec.token.startsWith(ACCESS_TOKEN_PREFIX)) {
+      throw new Error(`Ephemeral access token must start with "${ACCESS_TOKEN_PREFIX}"`);
+    }
+    return {
+      id: spec.id ?? `ephem_${ulid()}`,
+      name: sanitizeClientLabel(spec.name),
+      role: spec.role,
+      hashBuf: Buffer.from(hashAccessToken(spec.token), 'utf8'),
+    };
+  });
 
   let cache: {
     mtimeMs: number;
@@ -374,10 +380,13 @@ export function createAccessTokenStore(opts: AccessTokenStoreOptions): AccessTok
     }).catch(() => {});
   };
 
-  const watchTimer = setInterval(() => {
-    void refreshIfNeeded().catch(() => {});
-  }, opts.watchIntervalMs ?? 500);
-  watchTimer.unref?.();
+  const persistEnabled = opts.persist !== false;
+  const watchTimer = persistEnabled
+    ? setInterval(() => {
+        void refreshIfNeeded().catch(() => {});
+      }, opts.watchIntervalMs ?? 500)
+    : undefined;
+  watchTimer?.unref?.();
 
   return {
     async resolve(candidate: string): Promise<AccessPrincipal | null> {
@@ -392,6 +401,7 @@ export function createAccessTokenStore(opts: AccessTokenStoreOptions): AccessTok
           return { role: ephem.role, principalId: ephem.id, name: ephem.name };
         }
       }
+      if (!persistEnabled) return null;
       const records = await refreshIfNeeded();
       for (const rec of records) {
         if (rec.revoked_at !== null) continue;
@@ -431,7 +441,7 @@ export function createAccessTokenStore(opts: AccessTokenStoreOptions): AccessTok
     },
 
     dispose(): void {
-      clearInterval(watchTimer);
+      if (watchTimer !== undefined) clearInterval(watchTimer);
     },
   };
 }
