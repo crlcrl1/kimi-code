@@ -203,7 +203,22 @@ export function buildWebCommand(
 }
 
 export function formatJsonBootLine(origin: string, token: string): string {
-  const normalizedOrigin = origin.replace(/\/+$/, '');
+  const trimmed = origin.replace(/\/+$/, '');
+  const schemeIdx = trimmed.indexOf('://');
+  const scheme = schemeIdx >= 0 ? trimmed.slice(0, schemeIdx) : 'http';
+  const hostPort = schemeIdx >= 0 ? trimmed.slice(schemeIdx + 3) : trimmed;
+  const lastColon = hostPort.lastIndexOf(':');
+  const rawHost = lastColon >= 0 ? hostPort.slice(0, lastColon) : hostPort;
+  const portSuffix = lastColon >= 0 ? hostPort.slice(lastColon) : '';
+  const canonicalHost =
+    rawHost === '' || rawHost === '0.0.0.0'
+      ? '127.0.0.1'
+      : rawHost === '::'
+        ? '[::1]'
+        : rawHost.includes(':') && !rawHost.startsWith('[')
+          ? `[${rawHost}]`
+          : rawHost;
+  const normalizedOrigin = `${scheme}://${canonicalHost}${portSuffix}`;
   const url = new URL(normalizedOrigin);
   const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProtocol}//${url.host}/api/v1/ws`;

@@ -1,6 +1,10 @@
 import { timingSafeEqual } from 'node:crypto';
 
-import type { AccessPrincipal, AccessTokenStore } from './accessTokenStore';
+import {
+  ACCESS_TOKEN_PREFIX,
+  type AccessPrincipal,
+  type AccessTokenStore,
+} from './accessTokenStore';
 import type { IAuthTokenService } from './authTokenService';
 
 export type CredentialValidator = (candidate: string) => Promise<boolean>;
@@ -20,14 +24,15 @@ export function createPrincipalResolver(
   },
 ): PrincipalResolver {
   return async (candidate) => {
-    if (await authTokenService.isValid(candidate)) {
-      return { role: 'owner' };
+    if (opts?.accessTokenStore !== undefined && candidate.startsWith(ACCESS_TOKEN_PREFIX)) {
+      const scoped = await opts.accessTokenStore.resolve(candidate);
+      if (scoped !== null) return scoped;
     }
     if (opts?.rpcToken !== undefined && candidate.length > 0 && timingSafeMatch(candidate, opts.rpcToken)) {
       return { role: 'owner' };
     }
-    if (opts?.accessTokenStore !== undefined) {
-      return opts.accessTokenStore.resolve(candidate);
+    if (await authTokenService.isValid(candidate)) {
+      return { role: 'owner' };
     }
     return null;
   };

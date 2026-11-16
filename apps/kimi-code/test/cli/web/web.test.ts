@@ -1311,6 +1311,16 @@ describe('kimi web --json and kimi access CLI', () => {
       kimi_agent_protocol_version: '0.1.0',
     });
     expect(String(parsed['token']).startsWith('kap_')).toBe(true);
+
+    const { formatJsonBootLine } = await import('#/cli/sub/web/run');
+    expect(JSON.parse(formatJsonBootLine('http://::1:58627', 'kap_t'))).toMatchObject({
+      origin: 'http://[::1]:58627',
+      ws_url: 'ws://[::1]:58627/api/v1/ws',
+    });
+    expect(JSON.parse(formatJsonBootLine('http://:::58627', 'kap_t'))).toMatchObject({
+      origin: 'http://[::1]:58627',
+      ws_url: 'ws://[::1]:58627/api/v1/ws',
+    });
   });
 
   it('rejects combining --json with --remote-control or --dangerous-bypass-auth', async () => {

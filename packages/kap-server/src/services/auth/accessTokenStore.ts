@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { statSync } from 'node:fs';
-import { readdir, stat, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, open, readdir, stat, unlink } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 import { ulid } from 'ulid';
 
@@ -140,25 +140,65 @@ async function writeAccessTokenRecords(
   await writePrivateFile(filePath, `${JSON.stringify(payload, null, 2)}\n`);
 }
 
+async function withFileLock<T>(targetPath: string, fn: () => Promise<T>): Promise<T> {
+  const lockPath = `${targetPath}.lock`;
+  await mkdir(dirname(lockPath), { recursive: true, mode: 0o700 });
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    try {
+      const fh = await open(lockPath, 'wx', 0o600);
+      try {
+        await fh.writeFile(`${process.pid}:${Date.now()}`);
+      } finally {
+        await fh.close();
+      }
+      break;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EEXIST') throw error;
+      try {
+        const st = await stat(lockPath);
+        if (Date.now() - st.mtimeMs > 10_000) {
+          await unlink(lockPath).catch(() => {});
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      if (Date.now() >= deadline) {
+        throw new Error(`Timed out acquiring lock for ${targetPath}`, { cause: err });
+      }
+      await new Promise((r) => setTimeout(r, 15));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    await unlink(lockPath).catch(() => {});
+  }
+}
+
 export async function createPersistedAccessToken(
   homeDir: string,
   input: { readonly name: string; readonly role: ExternalAccessRole; readonly now?: Date },
 ): Promise<{ readonly token: string; readonly principal: AccessPrincipalView }> {
   const filePath = accessTokensPath(homeDir);
-  const existing = await readAccessTokenRecords(filePath);
-  const token = generateAccessToken();
-  const nowIso = (input.now ?? new Date()).toISOString();
-  const record: AccessTokenRecord = {
-    id: `tok_${ulid()}`,
-    name: input.name.trim(),
-    role: input.role,
-    token_hash: hashAccessToken(token),
-    created_at: nowIso,
-    last_used_at: null,
-    revoked_at: null,
-  };
-  await writeAccessTokenRecords(filePath, [...existing, record]);
-  return { token, principal: toPrincipalView(record) };
+  return withFileLock(filePath, async () => {
+    const existing = await readAccessTokenRecords(filePath);
+    const token = generateAccessToken();
+    const nowIso = (input.now ?? new Date()).toISOString();
+    const record: AccessTokenRecord = {
+      id: `tok_${ulid()}`,
+      name: input.name.trim(),
+      role: input.role,
+      token_hash: hashAccessToken(token),
+      created_at: nowIso,
+      last_used_at: null,
+      revoked_at: null,
+    };
+    await writeAccessTokenRecords(filePath, [...existing, record]);
+    return { token, principal: toPrincipalView(record) };
+  });
 }
 
 export async function listPersistedAccessPrincipals(
@@ -174,20 +214,22 @@ export async function revokePersistedAccessPrincipal(
   now: Date = new Date(),
 ): Promise<AccessPrincipalView | undefined> {
   const filePath = accessTokensPath(homeDir);
-  const records = await readAccessTokenRecords(filePath);
-  const index = records.findIndex((r) => r.id === principalId);
-  if (index < 0) return undefined;
-  const current = records[index]!;
-  const updated: AccessTokenRecord =
-    current.revoked_at !== null
-      ? current
-      : { ...current, revoked_at: now.toISOString() };
-  if (updated !== current) {
-    const next = [...records];
-    next[index] = updated;
-    await writeAccessTokenRecords(filePath, next);
-  }
-  return toPrincipalView(updated);
+  return withFileLock(filePath, async () => {
+    const records = await readAccessTokenRecords(filePath);
+    const index = records.findIndex((r) => r.id === principalId);
+    if (index < 0) return undefined;
+    const current = records[index]!;
+    const updated: AccessTokenRecord =
+      current.revoked_at !== null
+        ? current
+        : { ...current, revoked_at: now.toISOString() };
+    if (updated !== current) {
+      const next = [...records];
+      next[index] = updated;
+      await writeAccessTokenRecords(filePath, next);
+    }
+    return toPrincipalView(updated);
+  });
 }
 
 export interface EphemeralTokenSpec {
@@ -316,13 +358,15 @@ export function createAccessTokenStore(opts: AccessTokenStoreOptions): AccessTok
     lastUsedFlushedMs.set(principalId, nowMs);
     const nowIso = new Date(nowMs).toISOString();
     void enqueueWrite(async () => {
-      const current = await readAccessTokenRecords(filePath);
-      const idx = current.findIndex((r) => r.id === principalId && r.revoked_at === null);
-      if (idx < 0) return;
-      const next = [...current];
-      next[idx] = { ...current[idx]!, last_used_at: nowIso };
-      await writeAccessTokenRecords(filePath, next);
-      updateCacheAfterWrite(next);
+      await withFileLock(filePath, async () => {
+        const current = await readAccessTokenRecords(filePath);
+        const idx = current.findIndex((r) => r.id === principalId && r.revoked_at === null);
+        if (idx < 0) return;
+        const next = [...current];
+        next[idx] = { ...current[idx]!, last_used_at: nowIso };
+        await writeAccessTokenRecords(filePath, next);
+        updateCacheAfterWrite(next);
+      });
     }).catch(() => {});
   };
 
