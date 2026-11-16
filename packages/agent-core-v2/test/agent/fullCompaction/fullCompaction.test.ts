@@ -2238,6 +2238,7 @@ describe('FullCompaction', () => {
         ...CATALOGUED_MODEL_CAPABILITIES,
         maxContextSize: 32_000,
       },
+      tools: ['Read'],
     });
     ctx.appendExchange(1, 'old user one', 'old assistant one', 1_000);
 
@@ -2437,6 +2438,7 @@ describe('FullCompaction', () => {
     ctx.configure({
       provider: CATALOGUED_PROVIDER,
       modelCapabilities: CATALOGUED_MODEL_CAPABILITIES,
+      tools: ['Read'],
     });
     ctx.appendExchange(1, 'old user one', 'old assistant one', 20);
     ctx.newEvents();
@@ -2599,6 +2601,7 @@ describe('FullCompaction', () => {
     ctx.configure({
       provider: CATALOGUED_PROVIDER,
       modelCapabilities: CATALOGUED_MODEL_CAPABILITIES,
+      tools: ['Read'],
     });
     ctx.appendExchange(1, 'old user one', 'old assistant one', 20);
     ctx.newEvents();
@@ -2991,6 +2994,7 @@ describe('FullCompaction', () => {
     ctx.configure({
       provider: CATALOGUED_PROVIDER,
       modelCapabilities: CATALOGUED_MODEL_CAPABILITIES,
+      tools: ['Read'],
     });
     const modelResolver = ctx.modelResolver;
     if (modelResolver === undefined) throw new Error('Expected model provider');
@@ -3229,6 +3233,7 @@ describe('FullCompaction', () => {
         ...CATALOGUED_MODEL_CAPABILITIES,
         maxContextSize: 14,
       },
+      tools: ['Read'],
     });
     ctx.appendExchange(1, 'old user one', 'old assistant one', 1);
     const promptThatFitsWithoutPlaceholder = 'x'.repeat(40);
