@@ -41,7 +41,7 @@ R { "cancelled": true }
 
 The server listens on `http://127.0.0.1:58627` by default (probing up to 100 consecutive ports if busy; override with `--host` and `--port`, or pass `--port 0` to let the OS pick an ephemeral port).
 
-A running server exposes two machine-readable specifications generated from its validation schemas (both require authentication):
+A running server exposes two machine-readable specifications generated from its live validation schemas (both require authentication and return raw JSON documents rather than the `/api/v1` response envelope):
 
 - `GET /openapi.json`: REST specification (OpenAPI 3.0)
 - `GET /asyncapi.json`: WebSocket specification (AsyncAPI)
@@ -60,7 +60,7 @@ Missing or invalid credentials return HTTP 401 (`code: 40101`); missing, malform
 
 ## Response envelope
 
-Every JSON response (except raw binary streams) uses the same envelope:
+Every `/api/v1` JSON response (except `204` empty responses and binary streams) uses the same envelope:
 
 ```json
 {
