@@ -165,13 +165,13 @@ HTTP envelopes and WebSocket `response` frames share the same `code` table:
 | `50001`–`50004` | Internal error (`50001`), persistence failure (`50003`), catalog unavailable (`50004`) |
 | `6xxxx` | Tool execution failed (`60001`) or tool unavailable (`60002`) |
 
-**Cross-process concurrency (`40931` & `40932`)**: Clients connected to the *same* `kap-server` share live sessions in memory and never hit lock errors. `40931` (`SESSION_OCCUPIED`) appears only when another OS process holds the session lock on disk (retry once finished, or call `:takeover` if the holder crashed). `40932` (`SESSION_STALE`) is auto-reloaded transparently on `/prompts`, `/skills`, and `:compact`, and surfaces directly only on `:undo` so callers can inspect updated turns first.
+**Cross-process concurrency (`40931` & `40932`)**: Clients connected to the *same* `kap-server` share live sessions in memory and never hit lock errors. `40931` (`SESSION_OCCUPIED`) appears only when another OS process holds the session lock on disk: wait and retry once it finishes, or call `:takeover` **only after independently verifying that the holder process has exited** (`:takeover` unconditionally removes the lock without checking holder liveness; calling it against a live writer allows concurrent writes and corrupts session history). `40932` (`SESSION_STALE`) is auto-reloaded transparently on `/prompts`, `/skills`, and `:compact`, and surfaces directly only on `:undo` so callers can inspect updated turns first.
 
 ### Pagination styles
 
 - **`GET /api/v1/sessions`**: Returns `next_page_token` bound to query filters (changing filters returns `40922`); also accepts 1-based `page` or flat-view `before_id` / `after_id` (mutually exclusive).
 - **`POST /api/v1/search`**: Returns `page_token` (pass back as body `page_token`; malformed or filter-mismatched tokens return `40001`).
-- **`GET /api/v1/sessions/{session_id}/agents/{agent_id}/turns`**: Pass the earliest loaded turn's `ordinal` as `before_ordinal` (with `page_size`, default 20, max 100) to page backward through conversation history.
+- **`GET /api/v1/sessions/{session_id}/agents/{agent_id}/turns`**: Pass the earliest loaded turn's `ordinal` as `before_ordinal` (with `page_size`, default 50, max 200; capped at 1 MiB per page) to page backward through conversation history.
 
 ---
 
@@ -224,8 +224,8 @@ const done = new Promise((resolve, reject) => {
           content: [{ type: 'text', text: 'Summarize this repository in one sentence.' }],
         }),
       }).then((r) => r.json());
-      if (submit.code !== 0) {
-        reject(new Error(`Prompt rejected (${submit.code}): ${submit.msg}`));
+      if (submit.code !== 0 || submit.data?.status === 'blocked' || submit.data?.status === 'failed') {
+        reject(new Error(`Prompt rejected (${submit.code}/${submit.data?.status}): ${submit.msg}`));
       }
       return;
     }
@@ -266,8 +266,8 @@ Use `GET /openapi.json` and `GET /asyncapi.json` for exhaustive field types; thi
   - `{ id, workspace_id, cwd, title, created_at, updated_at, archived, archived_at?, activity: "idle" | "turn" | "background", pending_interaction: "none" | "approval" | "question", last_turn_outcome?: "completed" | "interrupted" | "failed", last_prompt?, metadata?, git? }`
   - `activity` reflects live state **in this server process** (`"turn"` while `main` has a running turn, `"background"` when only subagents/background tasks/compaction are active, and `"idle"` otherwise; cold sessions on disk or sessions running in another OS process report `activity: "idle"` and `pending_interaction: "none"`). Active model, thinking, permission mode, context usage, and goal live on per-agent WebSocket state frames (`agent`, `context`, `goal`), not on `Session`.
 - **`Turn` object** (in `turns`, `GET .../turns`, and without `items` in `turn.started` / `turn.ended`):
-  - `{ turn_id, ordinal, turn_number, kind: "agent" | "system", status: "running" | "ended", outcome?: "completed" | "interrupted" | "failed", end_reason?, error?, retry?, started_at, ended_at?, duration_ms?, usage?, steps: Step[], items: Item[] }`
-  - Sort turns by `ordinal` (0-based); pass `turn_number` to `/file-history/*` endpoints; `step.finish_reason` uses normalized values `"end_turn"`, `"tool_use"`, or `"interrupted"`.
+  - `{ turn_id, ordinal, turn_number?, kind: "agent" | "system", status: "running" | "ended", outcome?: "completed" | "interrupted" | "failed", end_reason?, error?, retry?, started_at, ended_at?, duration_ms?, usage?, steps: Step[], items: Item[] }`
+  - Sort turns by `ordinal` (0-based); `turn_number` is present on `agent` turns (pass it to `/file-history/*`) and omitted on `system` turns; `step.finish_reason` emits normalized strings such as `"end_turn"`, `"tool_use"`, `"interrupted"`, `"max_tokens"`, `"filtered"`, `"paused"`, `"error"`, or `"other"`.
 - **`Item` discriminated union** (keyed by `type`, sharing `{ item_id, type, step_index?, status: "running" | "ended", outcome?, created_at }`):
   - `user_message`: `{ prompt_ids: string[], placement: "opener" | "steer", origin: { kind, ... }, text, attachments, skills, metadata? }` — retire optimistic local input bubbles when their `prompt_id` appears in `prompt_ids`.
   - `assistant_message`: `{ text }` — model reply markdown.
@@ -278,7 +278,7 @@ Use `GET /openapi.json` and `GET /asyncapi.json` for exhaustive field types; thi
 - **Per-agent state frames** (full-replacement snapshots per `(session_id, agent_id)`):
   - `agent`: `{ status: "idle" | "running" | "ended", compacting: boolean, model?, thinking?, permission_mode?: "manual" | "auto" | "yolo", plan_mode, swarm_mode, tower_mode }`
   - `context`: `{ context_tokens, max_context_tokens? }` (coalesced ~250 ms)
-  - `goal`: `{ goal?: { objective, status, completion_criterion?, turns_used, tokens_used, wall_clock_ms } }` (`main` only)
+  - `goal`: `{ goal?: { objective, status, completion_criterion?, turns_used, tokens_used, wall_clock_ms } }` (`main` only; `wall_clock_ms` is a snapshot at `event_created_at`, so advance active goal timers locally between frames)
   - `todo`: `{ items: { title, status: "pending" | "in_progress" | "done" }[] }`
 
 ---
@@ -321,7 +321,7 @@ S {"type": "item.ended", "event_created_at": "2026-11-17T04:00:01.000Z", "sessio
 S {"type": "item.started", "event_created_at": "2026-11-17T04:00:01.300Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "item": {"item_id": "call_1", "type": "tool_call", "step_index": 1, "status": "running", "created_at": "2026-11-17T04:00:01.300Z", "name": "Read", "stage": "input", "input_text": "{\"path\":", "started_at": "2026-11-17T04:00:01.300Z"}}
 S {"type": "item.delta", "event_created_at": "2026-11-17T04:00:01.350Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "item_id": "call_1", "field": "input_text", "delta": "\"README.md\"}"}
 S {"type": "item.updated", "event_created_at": "2026-11-17T04:00:01.400Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "item_id": "call_1", "set": {"stage": "executing", "input": {"path": "README.md"}}}
-S {"type": "item.ended", "event_created_at": "2026-11-17T04:00:01.450Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "item": {"item_id": "call_1", "type": "tool_call", "step_index": 1, "status": "ended", "outcome": "completed", "created_at": "2026-11-17T04:00:01.300Z", "name": "Read", "stage": "executing", "input": {"path": "README.md"}, "output": "1\t# App", "started_at": "2026-11-17T04:00:01.300Z", "ended_at": "2026-11-17T04:00:01.450Z"}}
+S {"type": "item.ended", "event_created_at": "2026-11-17T04:00:01.450Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "item": {"item_id": "call_1", "type": "tool_call", "step_index": 1, "status": "ended", "outcome": "completed", "created_at": "2026-11-17T04:00:01.300Z", "name": "Read", "input": {"path": "README.md"}, "output": "1\t# App", "started_at": "2026-11-17T04:00:01.300Z", "ended_at": "2026-11-17T04:00:01.450Z"}}
 S {"type": "turn.updated", "event_created_at": "2026-11-17T04:00:01.450Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "step": {"index": 1, "outcome": "completed", "finish_reason": "tool_use", "started_at": "2026-11-17T04:00:01.100Z", "ended_at": "2026-11-17T04:00:01.450Z"}}
 S {"type": "item.started", "event_created_at": "2026-11-17T04:00:01.700Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "item": {"item_id": "a_1", "type": "assistant_message", "step_index": 2, "status": "running", "created_at": "2026-11-17T04:00:01.700Z", "text": "Done — "}}
 S {"type": "item.delta", "event_created_at": "2026-11-17T04:00:01.750Z", "session_id": "s1", "agent_id": "main", "turn_id": "t_1", "item_id": "a_1", "field": "text", "delta": "README.md defines # App."}
@@ -364,7 +364,7 @@ Maintain turns per `(session_id, agent_id)` sorted by `ordinal`, and reduce fram
 - **Submitting (`/prompts`) & prompt-queue synchronization**: Starts immediately (`status: "running"`) when idle, or enters the queue (`status: "queued"`) when busy. Always pass a client-generated `prompt_id` (deduplicated in-memory for up to 256 settled attempts per session within the current server process; resending the same `prompt_id` + body within that window is idempotent, reusing `prompt_id` with different content returns `40927`, and deduplication does not persist across server restarts). Note that setting fields applied by `/prompts` (`model`, `thinking`, `permission_mode`, `swarm_mode`, `disabled_tools`) mutates the target agent/session settings persistently for subsequent turns rather than scoping to a single turn (use `POST /api/v1/sessions/{session_id}/profile` to update `plan_mode`, `tower_mode`, or `goal`). There is no dedicated WebSocket frame for queue state changes: clients rendering a prompt queue should refresh `GET /api/v1/sessions/{session_id}/prompts` after queue mutations (`:abort`, `prompts:steer`, or queued submission) and remove entries locally as soon as their `prompt_id` appears in an emitted `user_message.prompt_ids`.
 - **Real runtime behavior of `/steer` and `/prompts:steer`**:
   1. **Stream interruption & continuation `Turn`**: When a steer arrives while the model is streaming, the loop immediately interrupts the in-flight model step (`step.outcome = "interrupted"`). Depending on the step boundary, the engine either injects the message into the current turn (`placement: "steer"`) **or** finishes the current turn and immediately starts a **new continuation `Turn` (with a brand-new `turn_id`)** carrying your steered message as `placement: "opener"`.
-  2. **Task-chain completion rule**: Orchestrators must **not** stop waiting on `turn.ended` of the initial `turn_id` alone. Treat work for a target agent (`"main"` by default, or the `agent_id` passed to `/prompts` for a side-chat) as finished only when: (a) all submitted `prompt_id`s for that agent have appeared in `user_message.prompt_ids`, **and** (b) that target agent's `agent` frame reports `status: "idle"` (`compacting: false`). (`turn.ended` is guaranteed to arrive before `agent` `status: "idle"`).
+  2. **Task-chain completion rule**: Orchestrators must **not** stop waiting on `turn.ended` of the initial `turn_id` alone. Treat work for a target agent (`"main"` by default, or the `agent_id` passed to `/prompts` for a side-chat) as finished only when: (a) all submitted `prompt_id`s for that agent have appeared in `user_message.prompt_ids`, **and** (b) that target agent's `agent` frame reports `status: "idle"` (`compacting: false`). (`turn.ended` arrives before `agent` `status: "idle"` once the initial `turns` page has loaded; while the initial `turns` snapshot is still loading from disk, conversation frames are buffered behind `turns` whereas `agent` state frames arrive immediately).
   3. **`POST /sessions/{id}/steer` blocks until injection — never block your WS loop**: Direct `POST .../steer` stays open until the agent reaches an injection point. If the agent is currently paused on a pending `interaction` (`approval` or `question`), it cannot reach an injection point until that interaction is answered. **Never `await fetch('/steer')` on the same coroutine/loop that processes WebSocket `interaction` frames**, or your client will deadlock! Handle WebSocket frames concurrently, or resolve pending interactions before calling `/steer`.
 - **Stopping everything (`:cancel` vs. queued prompts)**: `POST /sessions/{id}:cancel` stops the running turn (and background tasks if `include_background: true`), **not** queued prompts. To clear queued work as well, call `POST /sessions/{id}/prompts/{prompt_id}:abort` on queued items first, then `:cancel`.
 - **Undo (`:undo`), compaction (`:compact`), and side-chats (`:btw`)**:
@@ -428,17 +428,17 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 
 | Method & Path | Min Role | Gate | Summary |
 | --- | --- | --- | --- |
-| `GET /api/v1/healthz` | `public` | `baseline` | Unauthenticated liveness probe (`{ ok: true }`) |
+| `GET /api/v1/healthz` | `public` | `baseline` | Unauthenticated liveness & pre-auth bootstrap probe (`{ ok: true, kimi_agent_protocol_version, access_tokens }`) |
 | `GET /openapi.json` | `viewer` | `baseline` | Raw OpenAPI 3.0 specification for public `/api/v1` routes |
 | `GET /asyncapi.json` | `viewer` | `baseline` | Raw AsyncAPI 3.1 specification for `/api/v1/ws` frames |
 | `GET /api/v1/meta` | `viewer` | `baseline` | Protocol version, `server_version`, `server_id`, `capabilities`, `experimental_flags`, active `features` |
-| `GET /api/v1/access/me` | `viewer` | `access_tokens` | Caller's resolved `{ role, principal_id?, name? }` |
+| `GET /api/v1/access/me` | `viewer` | `baseline` | Caller's resolved `{ role, principal_id?, name? }` (available in all modes including `kimi web --json`) |
 | `POST /api/v1/access/requests` | `public` | `access_tokens` | Start local passwordless access handshake (Origin-checked & rate-limited) |
 | `POST /api/v1/access/requests/{id}:exchange` | `public` | `access_tokens` | Poll or claim `{ status, token, role, principal_id }` once using `device_code` |
 | `POST /api/v1/access/requests/{id}:resolve` | `owner` | `access_tokens` | Approve or reject a pending access request |
 | `GET /api/v1/access/principals` | `owner` | `access_tokens` | List issued external token principals (`access_tokens.json`) |
 | `DELETE /api/v1/access/principals/{principal_id}` | `owner` | `access_tokens` | Revoke an external token principal and close its active WebSocket connections |
-| `POST /api/v1/shutdown` | `owner` | `baseline` | Gracefully shut down the server (loopback by default) |
+| `POST /api/v1/shutdown` | `owner` | `baseline` (loopback or `--allow-remote-shutdown`) | Gracefully shut down the server (unmounted / `404` on non-loopback binds unless `--allow-remote-shutdown` is passed) |
 
 ### Sessions, turns, prompts, skills & interactions
 
@@ -452,7 +452,7 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | `POST /api/v1/sessions:archive` / `:restore` | `operator` | `baseline` | Batch archive or restore sessions by `ids` |
 | `POST /api/v1/sessions/{session_id}:archive` / `:restore` / `:delete` | `operator` | `baseline` | Archive, restore, or permanently delete one session |
 | `POST /api/v1/sessions/{session_id}:cancel` | `operator` | `baseline` | Cancel running turn (`agent_id?`, `include_background?`) |
-| `POST /api/v1/sessions/{session_id}:fork` | `operator` | `baseline` | Fork session up to optional `turn_index` into a new session |
+| `POST /api/v1/sessions/{session_id}:fork` | `operator` | `baseline` | Fork session up to optional `turn_index` into a new session (if forked mid-turn without `turn_index`, copies completed turns plus the active user prompt, omitting in-flight partial output and queued prompts) |
 | `POST /api/v1/sessions/{session_id}:undo` | `operator` | `baseline` | Remove `turn_id` and subsequent turns from conversation history |
 | `POST /api/v1/sessions/{session_id}:compact` | `operator` | `baseline` | Trigger manual context compaction (`instruction?`) |
 | `POST /api/v1/sessions/{session_id}:btw` | `operator` | `baseline` | Spawn a read-only side-chat agent (`agent_id`) forked from current context |
@@ -467,7 +467,7 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | `POST /api/v1/sessions/{session_id}/prompts` | `operator` | `baseline` | Submit user prompt (`prompt_id`, `content`, `agent_id?`, persistent agent setting updates, `skills?`) |
 | `POST /api/v1/sessions/{session_id}/steer` | `operator` | `baseline` | Directly steer a prompt into a running turn (blocks until injected) |
 | `POST /api/v1/sessions/{session_id}/prompts:steer` | `operator` | `baseline` | Convert queued `prompt_ids` into mid-turn steers |
-| `POST /api/v1/sessions/{session_id}/prompts/{prompt_id}:abort` | `operator` | `baseline` | Withdraw a queued prompt before execution |
+| `POST /api/v1/sessions/{session_id}/prompts/{prompt_id}:abort` | `operator` | `baseline` | Cancel the running turn started by `prompt_id` or withdraw `prompt_id` from the queue |
 | `POST /api/v1/sessions/{session_id}/interactions/{interaction_id}` | `operator` | `baseline` | Answer a pending `approval` or `question` interaction |
 | `GET /api/v1/sessions/{session_id}/skills` | `viewer` | `baseline` | List skills available to the session |
 | `POST /api/v1/sessions/{session_id}/skills/{name}:activate` | `operator` | `baseline` | Invoke a skill as a prompt submission |
@@ -493,13 +493,13 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | Method & Path | Min Role | Gate | Summary |
 | --- | --- | --- | --- |
 | `GET /api/v1/auth` | `viewer` | `baseline` | Auth & model readiness summary |
-| `GET /api/v1/models` & `GET /api/v1/providers` & `/providers/{id}` & `/catalog/providers*` | `viewer` | `baseline` | List configured model aliases, configured providers (redacted), and `models.dev` catalog |
+| `GET /api/v1/models` & `GET /api/v1/providers` & `/providers/{id}` & `/catalog/providers*` | `viewer` | `baseline` | List configured model aliases, configured providers (`api_key` redacted for non-`owner`; `owner` receives stored `api_key` on `/providers/{id}`), and `models.dev` catalog |
 | `POST /api/v1/models/{id}:set_default` & `POST`/`PUT`/`DELETE /api/v1/providers*` | `owner` | `baseline` | Set default model or create/update/delete/import/refresh providers (`owner` only) |
 | `GET /api/v1/config` / `POST /api/v1/config` | `viewer` / `owner` | `baseline` | Read redacted global config (`viewer+`) or merge-patch global config (`owner` only) |
 | `GET /api/v1/tools` | `viewer` | `baseline` | List registered agent tools |
 | `GET /api/v1/capabilities` & `/capabilities/{id}` / `POST /api/v1/capabilities/{id}:install` | `viewer` / `owner` | `baseline` | Inspect built-in capabilities (`viewer+`) or trigger install (`owner` only) |
-| `GET /api/v1/plugins` & `/plugins/marketplace` & `/plugins/{id}` / `POST /api/v1/plugins*` | `viewer` / `owner` | `baseline` | Read installed/marketplace plugins (`viewer+`) or preview/install/enable/disable/remove (`owner` only) |
-| `GET /api/v1/mcp/servers*` & `/mcp/auth-statuses` / `POST`/`PUT`/`DELETE /api/v1/mcp/*` | `viewer` / `owner` | `mcp` | Read MCP servers & auth statuses (`viewer+`) or mutate/test/inspect/OAuth global MCP servers (`owner` only) |
+| `GET /api/v1/plugins` & `/plugins/{id}` / `GET /api/v1/plugins/marketplace` & `POST /api/v1/plugins*` | `viewer` / `owner` | `baseline` | Read installed plugins (`viewer+`) or browse/reconcile marketplace and preview/install/enable/disable/remove (`owner` only) |
+| `GET /api/v1/mcp/servers*` & `/mcp/auth-statuses` / `POST`/`PUT`/`DELETE /api/v1/mcp/*` | `viewer` / `owner` | `mcp` | Read MCP servers (redacted for non-`owner`) & offline auth statuses (`viewer+`; `verify=true` requires `owner`) or mutate/test/inspect/OAuth global MCP servers (`owner` only) |
 | `GET /api/v1/oauth/usage` & `/oauth/userinfo` & `/oauth/region` | `viewer` | `baseline` | Read managed account quota, profile, and region |
 | `GET`/`POST`/`DELETE /api/v1/oauth/login` & `POST /api/v1/oauth/logout` | `owner` | `baseline` | Start/poll/cancel OAuth login or log out (`owner` only) |
 | `GET`/`POST`/`PATCH`/`DELETE /api/v1/remote-control*` | `owner` | `baseline` | Manage Kimi Remote Control tunnel and paired devices (`owner` only) |
@@ -515,7 +515,7 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | S → C | `response` | `viewer` | `websocket` | Reply to client command matched by `request_id` (`code`, `msg?`, `task?`) |
 | S → C | `turns` / `turns.failed` / `turns.removed` | `viewer` | `websocket` | Initial/reloaded turn page, load failure, or removed `turn_ids` |
 | S → C | `turn` (`turn.started` / `turn.ended`) & `turn.updated` | `viewer` | `websocket` | Turn header lifecycle (omits `items`) and step/retry updates |
-| S → C | `item` (`item.started` / `item.ended`), `item.delta`, `item.updated`, `item.removed` | `viewer` | `websocket` | Streaming item lifecycle (`item.started` carries initial non-empty text) |
+| S → C | `item` (`item.started` / `item.ended`), `item.delta`, `item.updated`, `item.removed` | `viewer` | `websocket` | Streaming item lifecycle (`assistant_message`/`reasoning` `item.started` carries initial non-empty text; `tool_call` may start with `input_text: ""`) |
 | S → C | `notice` | `viewer` | `websocket` | Transient agent warning/notice (not persisted in turns) |
 | S → C | `interaction` | `viewer` | `websocket` | Session-wide `pending` or `ended` approval/question state |
 | S → C | `agent` / `context` / `goal` / `todo` | `viewer` | `websocket` | Per-agent status/settings, token water-level, main goal, and todo list |

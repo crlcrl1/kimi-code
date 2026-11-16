@@ -92,8 +92,8 @@ const done = new Promise((resolve, reject) => {
           content: [{ type: 'text', text: 'Summarize this directory in one sentence.' }],
         }),
       }).then((r) => r.json());
-      if (submit.code !== 0) {
-        reject(new Error(`Prompt rejected (${submit.code}): ${submit.msg}`));
+      if (submit.code !== 0 || submit.data?.status === 'blocked' || submit.data?.status === 'failed') {
+        reject(new Error(`Prompt rejected (${submit.code}/${submit.data?.status}): ${submit.msg}`));
       }
       return;
     }

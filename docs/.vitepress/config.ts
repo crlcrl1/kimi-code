@@ -218,9 +218,11 @@ const config = withMermaid(defineConfig({
     ]
     for (const locale of ['en', 'zh'] as const) {
       const target = `${base}${locale}/guides/kap.html`
+      const quickStartHash = locale === 'zh' ? '#快速开始' : '#quick-start'
+      const authHash = locale === 'zh' ? '#连接与鉴权方式' : '#connecting-and-authenticating'
       const refDir = resolve(outDir, locale, 'reference')
       mkdirSync(refDir, { recursive: true })
-      const html = `<!DOCTYPE html><html lang="${locale}"><head><meta charset="utf-8"><title>Redirecting…</title><link rel="canonical" href="${target}"><meta http-equiv="refresh" content="0; url=${target}"><script>location.replace(${JSON.stringify(target)} + (location.hash || ''))</script></head><body><p>Redirecting to <a href="${target}">${target}</a>…</p></body></html>\n`
+      const html = `<!DOCTYPE html><html lang="${locale}"><head><meta charset="utf-8"><title>Redirecting…</title><link rel="canonical" href="${target}"><meta http-equiv="refresh" content="0; url=${target}"><script>(function(){var h=location.hash||'';var m='';if(/auth|鉴权/.test(h))m=${JSON.stringify(authHash)};else if(/quick-start|快速开始/.test(h))m=${JSON.stringify(quickStartHash)};location.replace(${JSON.stringify(target)}+m);})()</script></head><body><p>Redirecting to <a href="${target}">${target}</a>…</p></body></html>\n`
       for (const slug of legacyPages) {
         writeFileSync(resolve(refDir, `${slug}.html`), html, 'utf8')
       }
