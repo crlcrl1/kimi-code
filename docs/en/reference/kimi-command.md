@@ -181,6 +181,7 @@ Multiple instances can share one home directory: each registers itself under `~/
 | `--dangerous-bypass-auth` | Disable bearer-token auth on all REST and WebSocket routes so the web UI connects without a token; only for trusted networks or behind an authenticating proxy |
 | `--web-title <title>` | Custom browser tab title for the web UI; defaults to the workspace directory name |
 | `--no-open` | Do not open the browser once the server is ready |
+| `--json` | Subprocess bootstrap mode: implies `--no-open`, never reads or writes `~/.kimi-code/server.token`, mints an in-memory ephemeral `operator` token tied to this process, and prints a single JSON line `{ origin, ws_url, token, role, kimi_agent_protocol_version }` on `stdout` once ready |
 
 `kimi web` binds to local loopback only by default and prints the bearer token in the startup banner; the web UI authenticates automatically via the `#token=` URL fragment.
 
@@ -198,7 +199,21 @@ Deprecated — only stops a server started by a version before 0.28.0. Those ver
 
 #### `kimi web rotate-token`
 
-Generate a new persistent bearer token (written to `~/.kimi-code/server.token`); the previous token stops working immediately. The token is shared by the whole home directory, so every running instance picks the new one up on its next auth check — no restart needed.
+Generate a new persistent bearer token (written to `~/.kimi-code/server.token`); the previous token stops working immediately. The token is shared by the whole home directory, so every running `kimi web` instance picks the new one up on its next auth check — no restart needed.
+
+### `kimi access`
+
+Manage role-scoped external [KAP](../guides/kap.md) client tokens (stored as `sha256` hashes in `0600` `~/.kimi-code/server/access_tokens.json`) and approve pending local connection handshakes:
+
+```sh
+kimi access create --name "My Orchestrator"                 # Issue an operator token (plaintext printed once)
+kimi access create --name "Readonly Board" --role viewer    # Issue a read-only viewer token
+kimi access list                                            # List issued external token principals
+kimi access revoke tok_01JZX...                             # Revoke a token and close its live WebSocket connections
+kimi access approve ABCD-2345                               # Approve a pending local access request by verification code
+```
+
+All four subcommands accept `--json` for structured JSON output.
 
 ### `kimi app`
 

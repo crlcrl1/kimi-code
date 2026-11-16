@@ -181,6 +181,7 @@ kimi web --port 58628    # 指定绑定端口
 | `--dangerous-bypass-auth` | 关闭所有 REST 与 WebSocket 路由的 bearer token 鉴权，使 web UI 无需 token 即可连接；仅用于可信网络或自有鉴权代理之后 |
 | `--web-title <title>` | 自定义 web UI 的浏览器标签页标题；默认为工作区目录名 |
 | `--no-open` | 就绪后不自动打开浏览器 |
+| `--json` | 以子进程程序拉起模式启动：自动隐含 `--no-open`，不读写 `~/.kimi-code/server.token`，在内存中生成仅随本进程存活的临时 `operator` Token，就绪后在 `stdout` 首行输出单行 JSON `{ origin, ws_url, token, role, kimi_agent_protocol_version }` |
 
 `kimi web` 默认只绑定本机 loopback 地址，并在启动横幅中打印 bearer token；web UI 通过 URL 的 `#token=` 片段自动完成鉴权。
 
@@ -198,7 +199,21 @@ kimi web --port 58628    # 指定绑定端口
 
 #### `kimi web rotate-token`
 
-生成新的持久化 bearer token（写入 `~/.kimi-code/server.token`），旧 token 立即失效。token 是整个 home 目录共享的，所有运行中的实例会在下一次鉴权校验时自动换用新 token，无需重启。
+生成新的持久化 bearer token（写入 `~/.kimi-code/server.token`），旧 token 立即失效。token 是整个 home 目录共享的，所有运行中的 `kimi web` 实例会在下一次鉴权校验时自动换用新 token，无需重启。
+
+### `kimi access`
+
+管理供外部 [KAP](../guides/kap.md) 客户端使用的独立角色凭据（持久化在 `0600` 的 `~/.kimi-code/server/access_tokens.json`，仅保存 `sha256` 哈希），以及批准本机免密接入请求：
+
+```sh
+kimi access create --name "My Orchestrator"                 # 签发 operator 角色凭据（明文仅打印一次）
+kimi access create --name "Readonly Board" --role viewer    # 签发只读 viewer 角色凭据
+kimi access list                                            # 查看已签发的外部凭据列表
+kimi access revoke tok_01JZX...                             # 吊销指定凭据并实时断开其活跃 WebSocket 连接
+kimi access approve ABCD-2345                               # 凭核对码批准待决的本机接入握手请求
+```
+
+四个子命令均支持 `--json` 以结构化 JSON 输出结果。
 
 ### `kimi app`
 
