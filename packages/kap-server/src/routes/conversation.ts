@@ -160,7 +160,6 @@ const agentActions: ActionTable<'close', AgentActionExtra> = {
           }
           await session.accessor.get(ISessionBtwService).close(id);
         },
-        { retry: false },
       );
       reply.send(okEnvelope({ closed: true }, req.id));
     },

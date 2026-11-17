@@ -303,7 +303,7 @@ export class AgentLifecycleService extends Disposable implements IAgentLifecycle
       stage = 'register';
       await this.sessionMetadata.registerAgent(agentId, meta);
       if (this.cancelledAgentIds.has(agentId)) {
-        await this.sessionMetadata.unregisterAgent(agentId);
+        await this.sessionMetadata.unregisterAgent(agentId).catch(() => {});
         throw abortError(`Agent "${agentId}" was closed while starting`);
       }
       this.onDidCreateEmitter.fire(agent);
