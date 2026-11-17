@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { rmSync } from 'node:fs';
-import { mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { createConnection, createServer, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
 
 import { join } from 'pathe';
@@ -315,20 +316,20 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
     const isEphemeral = opts.ephemeral === true;
     const sessionScope = sessionScopeOf(this.handlerScope, opts.sessionId);
     if (isEphemeral) {
+      await ensureEphemeralOwnerBeacon();
       await sweepStaleEphemeralDirs();
     }
+    const ownerToken = ephemeralOwnerBeaconBound ? EPHEMERAL_INCARNATION_TOKEN : undefined;
+    const ownerPrefix = ownerToken === undefined
+      ? `${EPHEMERAL_DIR_PREFIX}${process.pid}-${opts.sessionId}-`
+      : `${EPHEMERAL_DIR_PREFIX}${process.pid}-${ownerToken}-${opts.sessionId}-`;
     const sessionDir = isEphemeral
-      ? await mkdtemp(
-          join(
-            tmpdir(),
-            `${EPHEMERAL_DIR_PREFIX}${process.pid}-${EPHEMERAL_INCARNATION_TOKEN}-${opts.sessionId}-`,
-          ),
-        )
+      ? await mkdtemp(join(tmpdir(), ownerPrefix))
       : sessionDirOf(this.bootstrap.homeDir, this.handlerScope, opts.sessionId);
     if (isEphemeral) {
       await writeFile(
         join(sessionDir, EPHEMERAL_PID_FILE),
-        `${process.pid}:${EPHEMERAL_INCARNATION_TOKEN}\n`,
+        ownerToken === undefined ? `${process.pid}\n` : `${process.pid}:${ownerToken}\n`,
         { mode: 0o600 },
       ).catch(() => {});
     }
@@ -419,18 +420,6 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
               );
             }
             if (isEphemeral) {
-              const heartbeatPath = join(sessionDir, EPHEMERAL_PID_FILE);
-              const heartbeatTimer = setInterval(() => {
-                const nowSec = Date.now() / 1000;
-                void utimes(heartbeatPath, nowSec, nowSec).catch(() => {});
-              }, EPHEMERAL_HEARTBEAT_INTERVAL_MS);
-              heartbeatTimer.unref?.();
-              container.anchorKernelEntry(
-                () => {
-                  clearInterval(heartbeatTimer);
-                },
-                'sessionLifecycle:ephemeralHeartbeat',
-              );
               container.anchorKernelFinalizer(
                 () => {
                   try {
@@ -1230,9 +1219,76 @@ const EPHEMERAL_INCARNATION_TOKEN = randomUUID().slice(0, 8);
 const EPHEMERAL_OWNER_PREFIX_RE = /^kimi-code-ephemeral-(\d+)(?:-([0-9a-f]{8}))?-/;
 const EPHEMERAL_PID_FILE = '.owner-pid';
 const EPHEMERAL_SWEEP_COOLDOWN_MS = 60_000;
-const EPHEMERAL_HEARTBEAT_INTERVAL_MS = 60_000;
-const EPHEMERAL_HEARTBEAT_STALE_MS = 5 * 60_000;
 let lastSweptEphemeralDirsAt = 0;
+let ephemeralOwnerBeacon: Promise<void> | undefined;
+let ephemeralOwnerBeaconBound = false;
+
+function ephemeralOwnerEndpoint(token: string): string {
+  return process.platform === 'win32'
+    ? `\\\\.\\pipe\\kimi-code-ephem-${token}`
+    : join(tmpdir(), `.kimi-ephem-${token}.sock`);
+}
+
+function ensureEphemeralOwnerBeacon(): Promise<void> {
+  if (ephemeralOwnerBeacon !== undefined) return ephemeralOwnerBeacon;
+  const endpoint = ephemeralOwnerEndpoint(EPHEMERAL_INCARNATION_TOKEN);
+  ephemeralOwnerBeacon = (async () => {
+    if (process.platform !== 'win32') {
+      await rm(endpoint, { force: true }).catch(() => {});
+    }
+    const server: Server = createServer((socket) => {
+      socket.destroy();
+    });
+    const bound = await new Promise<boolean>((resolve) => {
+      server.once('error', () => resolve(false));
+      server.listen(endpoint, () => resolve(true));
+    });
+    server.unref();
+    if (!bound) {
+      ephemeralOwnerBeaconBound = false;
+      return;
+    }
+    ephemeralOwnerBeaconBound = true;
+    if (process.platform !== 'win32') {
+      process.once('exit', () => {
+        try {
+          rmSync(endpoint, { force: true });
+        } catch {
+        }
+      });
+    }
+  })();
+  return ephemeralOwnerBeacon;
+}
+
+function isIncarnationBeaconAlive(token: string): Promise<'alive' | 'dead' | 'unknown'> {
+  const endpoint = ephemeralOwnerEndpoint(token);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result: 'alive' | 'dead' | 'unknown'): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(result);
+    };
+    const socket = createConnection(endpoint);
+    const timer = setTimeout(() => finish('alive'), 300);
+    timer.unref?.();
+    socket.once('connect', () => finish('alive'));
+    socket.once('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'ECONNREFUSED' || error.code === 'ENOENT') {
+        finish('dead');
+        return;
+      }
+      if (error.code === 'EACCES' || error.code === 'EPERM' || error.code === 'EAGAIN') {
+        finish('alive');
+        return;
+      }
+      finish('unknown');
+    });
+  });
+}
 
 function isPidAlive(pid: number): boolean {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -1285,11 +1341,19 @@ async function sweepStaleEphemeralDirs(): Promise<void> {
           }
           if (!isPidAlive(pid)) {
             await rm(dirPath, { recursive: true, force: true });
+            if (token !== undefined && process.platform !== 'win32') {
+              await rm(ephemeralOwnerEndpoint(token), { force: true }).catch(() => {});
+            }
             return;
           }
-          const markerStat = await stat(markerPath).catch(() => stat(dirPath));
-          if (now - markerStat.mtimeMs > EPHEMERAL_HEARTBEAT_STALE_MS) {
-            await rm(dirPath, { recursive: true, force: true });
+          if (token !== undefined) {
+            const state = await isIncarnationBeaconAlive(token);
+            if (state === 'dead') {
+              await rm(dirPath, { recursive: true, force: true });
+              if (process.platform !== 'win32') {
+                await rm(ephemeralOwnerEndpoint(token), { force: true }).catch(() => {});
+              }
+            }
           }
         } catch {
         }
