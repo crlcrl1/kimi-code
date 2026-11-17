@@ -1327,6 +1327,28 @@ describe('conversation contract e2e', () => {
           .closeIfIdle(sid, 0, { isRetained: () => true });
         expect(notReclaimedWhileRetained).toBe(false);
 
+        let retainedDuringHook = false;
+        const hookSub = server!.core.accessor.get(ISessionManager).onWillCloseSession?.((ev) => {
+          if (ev.sessionId !== sid) return;
+          ev.waitUntil(
+            new Promise<void>((resolve) => {
+              setTimeout(() => {
+                retainedDuringHook = true;
+                resolve();
+              }, 10);
+            }),
+          );
+        });
+        try {
+          const abortedAfterHook = await server!.core.accessor
+            .get(ISessionManager)
+            .closeIfIdle(sid, 0, { isRetained: () => retainedDuringHook });
+          expect(abortedAfterHook).toBe(false);
+          expect(getLiveSessionById(server!.core.accessor, sid)).toBeDefined();
+        } finally {
+          hookSub?.dispose();
+        }
+
         const retainedWhileIdle = await server!.core.accessor.get(ISessionManager).closeIfIdle(sid, 0);
         expect(retainedWhileIdle).toBe(true);
         expect(closeReasons).toContainEqual({ sessionId: sid, reason: 'exit' });

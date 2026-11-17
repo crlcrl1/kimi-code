@@ -618,12 +618,19 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
     return ready;
   }
 
-  async close(sessionId: string, reason: Exclude<SessionCloseReason, 'archive'> = 'exit'): Promise<void> {
+  async close(
+    sessionId: string,
+    reason: Exclude<SessionCloseReason, 'archive'> = 'exit',
+    options?: { readonly shouldAbortClose?: () => Promise<boolean> | boolean },
+  ): Promise<boolean> {
     const handle = this.sessions.get(sessionId);
-    if (handle === undefined) return;
+    if (handle === undefined) return false;
     const ctx = handle.accessor.get(ISessionContext);
     const isEphemeral = ctx.ephemeral === true;
     await this.announceWillClose({ sessionId, handle, reason });
+    if ((await options?.shouldAbortClose?.()) === true) {
+      return false;
+    }
     this.sessions.delete(sessionId);
     try {
       await this.drainAgents(handle);
@@ -641,6 +648,7 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
       this._onDidCloseSession.fire({ sessionId });
       const ended: SessionEndedEvent = { reason };
       this.telemetry.withContext({ session_id: sessionId }).track2('session_ended', ended);
+      return true;
     } catch (error) {
       if (isEphemeral) {
         void handle.dispose();
