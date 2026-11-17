@@ -469,7 +469,7 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 
 | Method & Path | Min Role | Gate | Summary |
 | --- | --- | --- | --- |
-| `POST /api/v1/sessions` | `operator` | `baseline` | Create a session (`cwd` or `workspace_id`, optional `title`, `metadata`, `agent_config`, `environment_id`) |
+| `POST /api/v1/sessions` | `operator` | `baseline` | Create a session (`cwd` or `workspace_id`, optional `title`, `metadata`, `agent_config` — `tower_mode: true` is rejected with `40001` at creation, enable Tower afterward via `/profile`; `environment_id`) |
 | `GET /api/v1/sessions` | `viewer` | `baseline` | List/filter/group sessions (`flat` or `by_workspace`, `include=git`, `fields=id,archived`, pagination) |
 | `GET /api/v1/sessions/{session_id}` | `viewer` | `baseline` | Get one session object |
 | `POST /api/v1/sessions/{session_id}/profile` | `operator` | `baseline` | Update `title`, `metadata` (replaces all non-reserved custom metadata keys as a whole — submit the complete custom object), or main `agent_config` (`model` — empty string `""` is ignored, pass a configured alias; `thinking`, `permission_mode`, `plan_mode`, `swarm_mode`, `tower_mode` + optional `tower_base` — if `tower_base` does not exist yet, enabling `tower_mode` creates/checks out that Git branch and commits dirty working-tree files as a Tower snapshot, `goal`) |
@@ -511,7 +511,7 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | `GET /api/v1/fs:browse` / `:home` / `:content` & `POST /api/v1/fs:mkdir` / `:suggest` | `owner` | `fs_query` | Host-wide folder picker and arbitrary host file reader (`owner` only) |
 | `POST /api/v1/search` | `viewer` | `baseline` | Eventually consistent full-text search across persisted session messages (in-flight streaming turns appear after persistence & background index sync; inspect `data.index_state.stale` to detect catch-up) |
 | `GET /api/v1/workspaces` & `GET /api/v1/workspaces/{id}/trust` & `/skills` | `viewer` | `baseline` | List registered workspaces, workspace trust status, and workspace skills |
-| `POST` / `PATCH` / `DELETE /api/v1/workspaces*` & `GET .../project-config-dirs` | `owner` | `baseline` | Register, rename, delete, set primary dir, or change trust of workspaces (`PATCH .../workspaces/{id}` `additional_dirs` replaces the workspace's entire additional-directory list — submit the full edited array; `owner` only) |
+| `POST` / `PATCH` / `DELETE /api/v1/workspaces*` & `GET .../project-config-dirs` | `owner` | `baseline` | Register, rename, delete, set primary dir (`POST .../workspaces/{id}/primary` immediately retargets existing local sessions without an explicit environment `cwd` to the new primary root for subsequent relative paths), or change trust of workspaces (`PATCH .../workspaces/{id}` `additional_dirs` replaces the workspace's entire additional-directory list — submit the full edited array; `owner` only) |
 
 ### Models, providers, config, tools, capabilities, plugins, MCP & OAuth
 
@@ -524,10 +524,10 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | `GET /api/v1/tools` | `viewer` | `baseline` | List registered agent tools |
 | `GET /api/v1/capabilities` & `/capabilities/{id}` / `POST /api/v1/capabilities/{id}:install` | `viewer` / `owner` | `baseline` | Inspect built-in capabilities (`viewer+`) or trigger install (`owner` only) |
 | `GET /api/v1/plugins` & `/plugins/{id}` / `GET /api/v1/plugins/marketplace` & `POST /api/v1/plugins*` | `viewer` / `owner` | `baseline` | Read installed plugins (`viewer+`) or browse/reconcile marketplace and preview/install/enable/disable/remove (`owner` only) |
-| `GET /api/v1/mcp/servers*` & `/mcp/auth-statuses` / `POST`/`PUT`/`DELETE /api/v1/mcp/*` | `viewer` / `owner` | `mcp` | Read MCP servers (redacted for non-`owner`), read `/mcp/auth-statuses` (`viewer`/`operator` always run offline; `owner` runs purely offline only with `?verify=false` — omitting `verify` probes unpinned remote servers and `verify=true` verifies all remote servers, both of which may refresh/invalidate stored credentials), or mutate/test/inspect/OAuth global MCP servers (`owner` only) |
+| `GET /api/v1/mcp/servers*` & `/mcp/auth-statuses` / `POST`/`PUT`/`DELETE /api/v1/mcp/*` | `viewer` / `owner` | `mcp` | Read MCP servers (redacted for non-`owner`), read `/mcp/auth-statuses` (`viewer`/`operator` always run offline; `owner` runs purely offline only with `?verify=false` — omitting `verify` probes unpinned remote servers and `verify=true` verifies all remote servers, both of which may refresh/invalidate stored credentials), or mutate/test/inspect/OAuth global MCP servers (`owner` only; closing the HTTP connection during `POST /mcp/auth:complete` aborts the callback wait and consumes `flow_id`, so start a fresh flow via `auth:begin` rather than retrying) |
 | `GET /api/v1/oauth/usage` & `/oauth/userinfo` & `/oauth/region` | `viewer` | `baseline` | Read managed account quota, profile, and region |
 | `GET`/`POST`/`DELETE /api/v1/oauth/login` & `POST /api/v1/oauth/logout` | `owner` | `baseline` | Start/poll/cancel OAuth login or log out (`owner` only; logging out `managed:kimi-code` also clears Remote Control state and tears down any active Remote Control tunnel) |
-| `GET`/`POST`/`PATCH`/`DELETE /api/v1/remote-control*` | `owner` | `baseline` | Manage Kimi Remote Control tunnel and paired devices (`owner` only) |
+| `GET`/`POST`/`PATCH`/`DELETE /api/v1/remote-control*` | `owner` | `baseline` | Manage Kimi Remote Control tunnel and paired devices (`owner` only; deactivating or deleting the local host's own device entry disables the local tunnel first and drops any request routed through that tunnel) |
 
 ### WebSocket `/api/v1/ws` frames
 
