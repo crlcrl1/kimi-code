@@ -413,7 +413,7 @@ R {"outcome": "answered", "ended_at": "2026-11-17T04:01:12.000Z"}
 ```
 
 - **Approval** (`kind: "approval"`): `{ "kind": "approval", "decision": "approved" | "rejected" | "cancelled", "scope"?: "session", "feedback"?: "..." }`. Omit `scope` for one-time approval; set `"scope": "session"` to approve matching actions for the rest of the session.
-- **Question** (`kind: "question"`): `{ "kind": "question", "answers": { "<question_id>": { "kind": "single", "option_id": "..." } } }` (also supports `{ "kind": "multi", "option_ids": [...] }`, `{ "kind": "other", "text": "..." }`, `{ "kind": "multi_with_other", "option_ids": [...], "other_text": "..." }`, `{ "kind": "skipped" }`), **or** `{ "kind": "question", "dismissed": true }` when an unattended orchestrator has no human operator available (prevents hanging the turn).
+- **Question** (`kind: "question"`): `{ "kind": "question", "answers": { "<question_id>": { "kind": "single", "option_id": "..." } } }` (also supports `{ "kind": "multi", "option_ids": [...] }`, `{ "kind": "other", "text": "..." }`, `{ "kind": "multi_with_other", "option_ids": [...], "other_text": "..." }`, `{ "kind": "skipped" }`), **or** `{ "kind": "question", "dismissed": true }` when an unattended orchestrator has no human operator available (prevents hanging the turn). Validate `question_id` and `option_id` values client-side against `request.questions` before submitting — the server passes unknown question/option IDs through as raw answer keys/strings rather than rejecting them with `40001`.
 - **Close UI on WS `status: "ended"`**: Wait for the `interaction` frame with `status: "ended"` to dismiss UI prompts so multiple windows stay synchronized; treat HTTP `40902` (already ended) and `40404` (evicted) as benign races.
 
 ### 6. Task output (`task.watch`), reconnection, and global events
@@ -472,7 +472,7 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | `POST /api/v1/sessions` | `operator` | `baseline` | Create a session (`cwd` or `workspace_id`, optional `title`, `metadata`, `agent_config`, `environment_id`) |
 | `GET /api/v1/sessions` | `viewer` | `baseline` | List/filter/group sessions (`flat` or `by_workspace`, `include=git`, `fields=id,archived`, pagination) |
 | `GET /api/v1/sessions/{session_id}` | `viewer` | `baseline` | Get one session object |
-| `POST /api/v1/sessions/{session_id}/profile` | `operator` | `baseline` | Update `title`, `metadata` (replaces all non-reserved custom metadata keys as a whole — submit the complete custom object), or main `agent_config` (`model`, `thinking`, `permission_mode`, `plan_mode`, `swarm_mode`, `tower_mode`, `goal`) |
+| `POST /api/v1/sessions/{session_id}/profile` | `operator` | `baseline` | Update `title`, `metadata` (replaces all non-reserved custom metadata keys as a whole — submit the complete custom object), or main `agent_config` (`model` — empty string `""` is ignored, pass a configured alias; `thinking`, `permission_mode`, `plan_mode`, `swarm_mode`, `tower_mode` + optional `tower_base` — if `tower_base` does not exist yet, enabling `tower_mode` creates/checks out that Git branch and commits dirty working-tree files as a Tower snapshot, `goal`) |
 | `POST /api/v1/sessions/{session_id}/title/generate` | `operator` | `baseline` | Generate a session title from conversation context |
 | `POST /api/v1/sessions:archive` / `:restore` | `operator` | `baseline` | Batch archive or restore sessions by `ids` |
 | `POST /api/v1/sessions/{session_id}:archive` / `:restore` / `:delete` | `operator` | `baseline` | Archive, restore, or permanently delete one session |
@@ -481,7 +481,7 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | `POST /api/v1/sessions/{session_id}:undo` | `operator` | `baseline` | Remove `turn_id` and subsequent turns from conversation history |
 | `POST /api/v1/sessions/{session_id}:compact` | `operator` | `baseline` | Trigger manual context compaction (`instruction?`) |
 | `POST /api/v1/sessions/{session_id}:btw` | `operator` | `baseline` | Spawn a read-only side-chat agent (`agent_id`) forked from current context |
-| `POST /api/v1/sessions/{session_id}:reload` | `operator` | `baseline` | Close and reload in-memory session state from disk |
+| `POST /api/v1/sessions/{session_id}:reload` | `operator` | `baseline` | Reload server-wide config/plugins, refresh workspace catalogs & change reminders, then close and reopen the session from disk |
 | `POST /api/v1/sessions/{session_id}:takeover` | `operator` | `baseline` | Break a stale cross-process session lock (`40931`) |
 | `POST /api/v1/sessions/{session_id}/export` | `operator` | `baseline` | Export session archive as ZIP |
 | `GET /api/v1/sessions/{session_id}/warnings` | `viewer` | `baseline` | List active session diagnostics/warnings |
