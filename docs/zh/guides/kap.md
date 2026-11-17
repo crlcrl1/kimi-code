@@ -45,7 +45,7 @@ KAP 的协议行为规范与接口目录完整维护在 [`https://code.kimi.com/
 
 ## 快速开始
 
-下面用一段零依赖的 Node.js 脚本（Node.js 22+ 内置 `WebSocket`）演示通过 `kimi web --port 0 --json` 拉起服务、创建会话、订阅实时事件并流式打印回复的最小闭环。将代码保存为 `demo.mjs` 后运行 `node demo.mjs`：
+下面用一段零依赖的 Node.js 22.19+ 脚本（Node.js 内置 `WebSocket`，且 `kimi` CLI 要求 Node.js `>=22.19.0`）演示通过 `kimi web --port 0 --json` 拉起服务、创建会话、订阅实时事件并流式打印回复的最小闭环。将代码保存为 `demo.mjs` 后运行 `node demo.mjs`：
 
 ```js
 import { spawn } from 'node:child_process';

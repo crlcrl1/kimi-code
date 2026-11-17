@@ -45,7 +45,7 @@ External clients and orchestrators **must never read `~/.kimi-code/server.token`
 
 ## Quick start
 
-This dependency-free Node.js 22+ script (`WebSocket` is built into Node.js 22+) spawns `kimi web --port 0 --json`, creates a session, subscribes over WebSocket, submits a prompt, and streams the reply. Save it as `demo.mjs` and run `node demo.mjs`:
+This dependency-free Node.js 22.19+ script (`WebSocket` is built in, and the `kimi` CLI requires Node.js `>=22.19.0`) spawns `kimi web --port 0 --json`, creates a session, subscribes over WebSocket, submits a prompt, and streams the reply. Save it as `demo.mjs` and run `node demo.mjs`:
 
 ```js
 import { spawn } from 'node:child_process';
