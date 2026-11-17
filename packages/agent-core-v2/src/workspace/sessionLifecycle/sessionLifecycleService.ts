@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { rmSync } from 'node:fs';
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 import { join } from 'pathe';
@@ -419,6 +419,18 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
               );
             }
             if (isEphemeral) {
+              const heartbeatPath = join(sessionDir, EPHEMERAL_PID_FILE);
+              const heartbeatTimer = setInterval(() => {
+                const nowSec = Date.now() / 1000;
+                void utimes(heartbeatPath, nowSec, nowSec).catch(() => {});
+              }, EPHEMERAL_HEARTBEAT_INTERVAL_MS);
+              heartbeatTimer.unref?.();
+              container.anchorKernelEntry(
+                () => {
+                  clearInterval(heartbeatTimer);
+                },
+                'sessionLifecycle:ephemeralHeartbeat',
+              );
               container.anchorKernelFinalizer(
                 () => {
                   try {
@@ -1218,6 +1230,8 @@ const EPHEMERAL_INCARNATION_TOKEN = randomUUID().slice(0, 8);
 const EPHEMERAL_OWNER_PREFIX_RE = /^kimi-code-ephemeral-(\d+)(?:-([0-9a-f]{8}))?-/;
 const EPHEMERAL_PID_FILE = '.owner-pid';
 const EPHEMERAL_SWEEP_COOLDOWN_MS = 60_000;
+const EPHEMERAL_HEARTBEAT_INTERVAL_MS = 60_000;
+const EPHEMERAL_HEARTBEAT_STALE_MS = 5 * 60_000;
 let lastSweptEphemeralDirsAt = 0;
 
 function isPidAlive(pid: number): boolean {
@@ -1249,6 +1263,7 @@ async function sweepStaleEphemeralDirs(): Promise<void> {
       .map(async (name) => {
         const dirPath = join(root, name);
         try {
+          const markerPath = join(dirPath, EPHEMERAL_PID_FILE);
           const prefixMatch = EPHEMERAL_OWNER_PREFIX_RE.exec(name);
           let pid: number;
           let token: string | undefined;
@@ -1256,13 +1271,24 @@ async function sweepStaleEphemeralDirs(): Promise<void> {
             pid = Number.parseInt(prefixMatch[1]!, 10);
             token = prefixMatch[2];
           } else {
-            const raw = (await readFile(join(dirPath, EPHEMERAL_PID_FILE), 'utf8')).trim();
+            const raw = (await readFile(markerPath, 'utf8')).trim();
             const [pidPart = '', tokenPart] = raw.split(':');
             pid = Number.parseInt(pidPart, 10);
             token = tokenPart;
           }
           if (!Number.isFinite(pid)) return;
-          if (pid === process.pid ? token !== EPHEMERAL_INCARNATION_TOKEN : !isPidAlive(pid)) {
+          if (pid === process.pid) {
+            if (token !== EPHEMERAL_INCARNATION_TOKEN) {
+              await rm(dirPath, { recursive: true, force: true });
+            }
+            return;
+          }
+          if (!isPidAlive(pid)) {
+            await rm(dirPath, { recursive: true, force: true });
+            return;
+          }
+          const markerStat = await stat(markerPath).catch(() => stat(dirPath));
+          if (now - markerStat.mtimeMs > EPHEMERAL_HEARTBEAT_STALE_MS) {
             await rm(dirPath, { recursive: true, force: true });
           }
         } catch {
