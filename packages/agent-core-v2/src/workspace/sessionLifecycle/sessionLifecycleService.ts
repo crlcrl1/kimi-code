@@ -621,17 +621,13 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
   async close(
     sessionId: string,
     reason: Exclude<SessionCloseReason, 'archive'> = 'exit',
-    options?: { readonly shouldAbortClose?: () => Promise<boolean> | boolean },
-  ): Promise<boolean> {
+  ): Promise<void> {
     const handle = this.sessions.get(sessionId);
-    if (handle === undefined) return false;
+    if (handle === undefined) return;
     const ctx = handle.accessor.get(ISessionContext);
     const isEphemeral = ctx.ephemeral === true;
-    await this.announceWillClose({ sessionId, handle, reason });
-    if ((await options?.shouldAbortClose?.()) === true) {
-      return false;
-    }
     this.sessions.delete(sessionId);
+    await this.announceWillClose({ sessionId, handle, reason });
     try {
       await this.drainAgents(handle);
       await this.appendLogStore.drainRetirements();
@@ -648,7 +644,6 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
       this._onDidCloseSession.fire({ sessionId });
       const ended: SessionEndedEvent = { reason };
       this.telemetry.withContext({ session_id: sessionId }).track2('session_ended', ended);
-      return true;
     } catch (error) {
       if (isEphemeral) {
         void handle.dispose();
@@ -1222,7 +1217,8 @@ const EPHEMERAL_DIR_PREFIX = 'kimi-code-ephemeral-';
 const EPHEMERAL_INCARNATION_TOKEN = randomUUID().slice(0, 8);
 const EPHEMERAL_OWNER_PREFIX_RE = /^kimi-code-ephemeral-(\d+)(?:-([0-9a-f]{8}))?-/;
 const EPHEMERAL_PID_FILE = '.owner-pid';
-let sweptStaleEphemeralDirs = false;
+const EPHEMERAL_SWEEP_COOLDOWN_MS = 60_000;
+let lastSweptEphemeralDirsAt = 0;
 
 function isPidAlive(pid: number): boolean {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -1235,8 +1231,11 @@ function isPidAlive(pid: number): boolean {
 }
 
 async function sweepStaleEphemeralDirs(): Promise<void> {
-  if (sweptStaleEphemeralDirs) return;
-  sweptStaleEphemeralDirs = true;
+  const now = Date.now();
+  if (lastSweptEphemeralDirsAt > 0 && now - lastSweptEphemeralDirsAt < EPHEMERAL_SWEEP_COOLDOWN_MS) {
+    return;
+  }
+  lastSweptEphemeralDirsAt = now;
   const root = tmpdir();
   let entries: string[];
   try {

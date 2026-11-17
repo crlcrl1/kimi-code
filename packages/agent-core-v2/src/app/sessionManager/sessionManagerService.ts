@@ -327,13 +327,11 @@ export class SessionManager implements ISessionManager {
         try {
           if (await this.retained(handle)) return false;
           if (isEphemeral && options?.isRetained?.() === true) return false;
-          const closed = await controller.close(sessionId, isEphemeral ? 'exit' : 'reclaim', {
-            shouldAbortClose: async () =>
-              Date.now() - handle.accessor.get(ISessionActivityView).lastActiveAt() < idleTimeoutMs ||
-              (await this.retained(handle)) ||
-              (isEphemeral && options?.isRetained?.() === true),
-          });
-          if (closed === false) return false;
+          if (isEphemeral) {
+            this.sessions.delete(sessionId);
+            this.owners.delete(sessionId);
+          }
+          await controller.close(sessionId, isEphemeral ? 'exit' : 'reclaim');
           if (!isEphemeral) this.reclaimed.add(sessionId);
           return true;
         } finally {
