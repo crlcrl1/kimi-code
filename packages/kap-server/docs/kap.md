@@ -124,13 +124,13 @@ KAP `/api/v1` enforces three evolution rules so third-party clients work reliabl
 ### Submitting attachments & activating skills
 
 - **File / image attachments**: Upload via `POST /api/v1/files` (`multipart/form-data` with field `file`, max size governed by server limits), receive `{ id, name, media_type, size }`, and reference `file_id` inside `POST /api/v1/sessions/{session_id}/prompts` `content` parts (see `promptSubmissionSchema` in `GET /openapi.json` for exact text, image, audio, video, and file content part variants).
-- **Skill invocation**: List available skills via `GET /api/v1/sessions/{session_id}/skills`, then either attach `skills: [{ name, args? }]` on `POST .../prompts` or invoke `POST /api/v1/sessions/{session_id}/skills/{name}:activate` directly.
+- **Skill invocation**: List available skills via `GET /api/v1/sessions/{session_id}/skills`, then either attach `skills: [{ name, args? }]` on `POST .../prompts` or invoke `POST /api/v1/sessions/{session_id}/skills/{name}:activate` directly (starts a turn when idle, or steers into the running turn and blocks until an injection point just like `/steer` when busy — see `/steer` rules below).
 
 ### Wire conventions & response envelope
 
 - **Field naming & units**: KAP envelope, route, and event wire fields use `snake_case` (passthrough exceptions: managed OAuth `limit5h`/`usedRatio`/`resetAt`/`userInfo`/`userId`, `:undo` `40911` `data` `{ reason, requestedCount, undoableCount }`, and opaque caller/engine passthrough payloads such as `tool_call.input`, `tool_call.display`, `tool_call.fields`, `origin`, and caller `metadata`). Timestamps are ISO 8601 strings; durations end with `_ms`.
 - **Opaque IDs**: Treat `session_id`, `turn_id`, `item_id`, `interaction_id`, `task_id`, `workspace_id`, and `principal_id` as opaque strings. `turn_id` and `item_id` are deterministic across WebSocket frames and `GET .../turns` history.
-- **Standard JSON envelope**: Every `/api/v1` JSON response (except `204` empty responses and raw binary streams) has the shape:
+- **Standard JSON envelope**: Every `/api/v1` JSON response (except `204` empty responses, raw binary streams, and `stream: true` on `POST /api/v1/workspace/fs:suggest` / `POST /api/v1/fs:suggest` — which streams HTTP `200` `application/x-ndjson` lines of `code: 0` envelopes where `data.phase` is `"preview"` / `"final"` replacing earlier suggestions, or `"error"` with `data.error: { code, message }` on mid-stream failure) has the shape:
   ```json
   {
     "code": 0,
@@ -341,23 +341,31 @@ Maintain turns per `(session_id, agent_id)` sorted by `ordinal`, and reduce fram
 - **`turn.updated`**: Upsert `frame.step` into `turn.steps` by `step.index`; set `turn.retry = frame.retry` (when `frame.retry` is omitted, clear any active retry state).
 - **`item.started` may carry non-empty initial text (lazy start)**: For `assistant_message` and `reasoning`, the server emits `item.started` on the first content chunk so **`item.started.item.text` is already non-empty**, and short replies frequently transition directly from `item.started` to `item.ended` with **zero** `item.delta` frames (`tool_call` `item.started` may start with `input_text: ""` when the tool name arrives before its arguments, or with the initial argument chunk, and starts without an `output` field). Always apply:
   ```js
-  // item.started: upsert initial item; item.ended: replace in full (ended omits transient fields like stage or streamed output on failure)
-  if (frame.type === 'item.ended') {
-    itemsById.set(frame.item.item_id, frame.item);
-  } else {
-    itemsById.set(frame.item.item_id, { ...itemsById.get(frame.item.item_id), ...frame.item });
+  switch (frame.type) {
+    case 'item.started':
+      itemsById.set(frame.item.item_id, { ...itemsById.get(frame.item.item_id), ...frame.item });
+      break;
+    case 'item.ended':
+      // Replace in full (ended omits transient fields like stage or streamed output on failure)
+      itemsById.set(frame.item.item_id, frame.item);
+      break;
+    case 'item.delta': {
+      // Nullish-safe string concatenation (field is "text" | "input_text" | "output")
+      const item = itemsById.get(frame.item_id);
+      if (item) item[frame.field] = (item[frame.field] ?? '') + frame.delta;
+      break;
+    }
+    case 'item.updated': {
+      // Shallow field patch (e.g. stage -> "awaiting_approval" | "executing")
+      const target = itemsById.get(frame.item_id);
+      if (target) Object.assign(target, frame.set);
+      break;
+    }
+    case 'item.removed':
+      // Discard partial item before an LLM retry restarts the step
+      itemsById.delete(frame.item_id);
+      break;
   }
-
-  // item.delta: nullish-safe string concatenation (field is "text" | "input_text" | "output")
-  const item = itemsById.get(frame.item_id);
-  if (item) item[frame.field] = (item[frame.field] ?? '') + frame.delta;
-
-  // item.updated: shallow field patch (e.g. stage -> "awaiting_approval" | "executing")
-  const target = itemsById.get(frame.item_id);
-  if (target) Object.assign(target, frame.set);
-
-  // item.removed: discard partial item before an LLM retry restarts the step
-  itemsById.delete(frame.item_id);
   ```
 - **`turns.removed`**: Delete all turns in `frame.turn_ids` (after `:undo` or context reset) and drop any in-flight `GET .../turns` responses requested prior to this frame.
 - **Out-of-order interaction vs. tool item & HTTP vs. WS**:
@@ -366,15 +374,15 @@ Maintain turns per `(session_id, agent_id)` sorted by `ordinal`, and reduce fram
 
 ### 4. Prompts, `/steer` cross-turn behavior, and completion criteria
 
-- **Submitting (`/prompts`) & prompt-queue synchronization**: Starts immediately (`status: "running"`) when idle, or enters the queue (`status: "queued"`) when busy. Always pass a client-generated `prompt_id` (deduplicated in-memory for up to 256 settled attempts per session within the current server process; resending the same `prompt_id` + body within that window is idempotent, reusing `prompt_id` with different content returns `40927`, and deduplication does not persist across server restarts). Note that setting fields applied by `/prompts` (`model`, `thinking`, `permission_mode`, `swarm_mode`, `disabled_tools`) and `/profile` (`title`, `metadata`, `agent_config`) mutate the target agent/session settings **sequentially and non-atomically without rollback** for subsequent turns (if a later field fails validation or mode preconditions such as `40935`, earlier field updates in the same request remain applied and broadcast; use `POST /api/v1/sessions/{session_id}/profile` to update `plan_mode`, `tower_mode`, or `goal`). There is no dedicated WebSocket frame for queue state changes: clients rendering a prompt queue should refresh `GET /api/v1/sessions/{session_id}/prompts` after queue mutations (`:abort`, `prompts:steer`, or queued submission) and remove entries locally as soon as their `prompt_id` appears in an emitted `user_message.prompt_ids`.
-- **Real runtime behavior of `/steer` and `/prompts:steer`**:
+- **Submitting (`/prompts`) & prompt-queue synchronization**: Starts immediately (`status: "running"`) when idle, or enters the queue (`status: "queued"`) when busy. Always pass a client-generated `prompt_id`: `/prompts`, `/steer`, and `/skills/{name}:activate` share a single in-memory per-session deduplication table of up to 256 **enqueued** attempts within the current server process (resending the identical `prompt_id` + route + body after enqueueing returns the original result, reusing `prompt_id` with a different route or body returns `40927`, attempts that fail before enqueueing — e.g. validation, attachment resolution, or pre-turn hooks — release `prompt_id` so retries execute fresh, and deduplication does not persist across server restarts). Note that setting fields applied by `/prompts` (`model`, `thinking`, `permission_mode`, `swarm_mode`, `disabled_tools`) and `/profile` (`title`, `metadata`, `agent_config`) mutate the target agent/session settings **sequentially and non-atomically without rollback** for subsequent turns (if a later field fails validation or mode preconditions such as `40935`, earlier field updates in the same request remain applied and broadcast; use `POST /api/v1/sessions/{session_id}/profile` to update `plan_mode`, `tower_mode`, or `goal`). There is no dedicated WebSocket frame for queue state changes: clients rendering a prompt queue should refresh `GET /api/v1/sessions/{session_id}/prompts` after queue mutations (`:abort`, `prompts:steer`, or queued submission) and remove entries locally as soon as their `prompt_id` appears in an emitted `user_message.prompt_ids`.
+- **Real runtime behavior of `/steer`, `/prompts:steer`, and busy `/skills/{name}:activate`**:
   1. **Stream interruption & continuation `Turn`**: When a steer arrives while the model is streaming, the loop immediately interrupts the in-flight model step (`step.outcome = "interrupted"`). Depending on the step boundary, the engine either injects the message into the current turn (`placement: "steer"`) **or** finishes the current turn and immediately starts a **new continuation `Turn` (with a brand-new `turn_id`)** carrying your steered message as `placement: "opener"`.
   2. **Task-chain completion rule**: Orchestrators must **not** stop waiting on `turn.ended` of the initial `turn_id` alone. Treat work for a target agent (`"main"` by default, or the `agent_id` passed to `/prompts` for a side-chat) as finished only when: (a) all submitted `prompt_id`s for that agent have appeared in `user_message.prompt_ids`, **and** (b) that target agent's `agent` frame reports `status: "idle"` (`compacting: false`). (`turn.ended` arrives before `agent` `status: "idle"` once the initial `turns` page has loaded; while the initial `turns` snapshot is still loading from disk, conversation frames are buffered behind `turns` whereas `agent` state frames arrive immediately).
-  3. **`POST /sessions/{id}/steer` blocks until injection — never block your WS loop**: Direct `POST .../steer` stays open until the agent reaches an injection point. If the agent is currently paused on a pending `interaction` (`approval` or `question`), it cannot reach an injection point until that interaction is answered. **Never `await fetch('/steer')` on the same coroutine/loop that processes WebSocket `interaction` frames**, or your client will deadlock! Handle WebSocket frames concurrently, or resolve pending interactions before calling `/steer`.
+  3. **`POST /sessions/{id}/steer` (and `/skills/{name}:activate` while busy) blocks until injection — never block your WS loop**: Direct `POST .../steer` (as well as `POST .../skills/{name}:activate` when `main` is running) stays open until the agent reaches an injection point. If the agent is currently paused on a pending `interaction` (`approval` or `question`), it cannot reach an injection point until that interaction is answered. **Never `await` `/steer` or `:activate` on the same coroutine/loop that processes WebSocket `interaction` frames**, or your client will deadlock! Handle WebSocket frames concurrently, or resolve pending interactions before calling `/steer` / `:activate`.
 - **Stopping everything (`:cancel` vs. queued prompts)**: `POST /sessions/{id}:cancel` stops the running turn (plus queued skill activations when an active turn is cancelled, and background tasks if `include_background: true`), **not** ordinary queued user prompts or steers. To clear queued user prompts as well, call `POST /sessions/{id}/prompts/{prompt_id}:abort` on queued items first, then `:cancel`.
 - **Undo (`:undo`), compaction (`:compact`), and side-chats (`:btw`)**:
-  - `POST /sessions/{id}:undo` (`{ turn_id, agent_id? }`) removes `turn_id` and all later turns from history and broadcasts `turns.removed` (does not revert disk edits; returns `40911` across a prior compaction boundary or `40901` while busy).
-  - `POST /sessions/{id}:compact` (`{ instruction? }`) runs manual context compaction when idle (`agent.compacting` flips `true` → emits a `system` compaction turn → flips `false`).
+  - `POST /sessions/{id}:undo` (`{ turn_id, agent_id? }`) removes `turn_id` and all later turns from history and broadcasts `turns.removed` (neither reverts disk edits nor stops running shell/subagent tasks — stop active tasks explicitly via WS `task.stop` or `:cancel` with `include_background: true`; returns `40911` across a prior compaction boundary or `40901` while busy).
+  - `POST /sessions/{id}:compact` (`{ instruction? }`) runs manual context compaction when idle (`agent.compacting` flips `true` → emits a `system` compaction turn → flips `false`; if cancelled mid-compaction, emits a `notice` frame with `code: "compaction.cancelled"` and flips `agent.compacting` back to `false` without appending a compaction turn).
   - `POST /sessions/{id}:btw` spawns a read-only forked side-chat agent (`{ agent_id }`); subscribe incrementally with `agent_ids: [agent_id]` and send prompts targeting `agent_id`.
 
 ### 5. Approvals and questions (`interaction`)
@@ -408,7 +416,7 @@ S {"type": "response", "request_id": "s1-stop", "code": 0, "task": {"task_id": "
 ```
 
 - **Task list & output (`task.list`, `task`, `task.output`)**:
-  - `task.list` is a full replacement snapshot of running tasks for `(session_id, agent_id)` (discard local running entries absent from the snapshot); each incremental `task` frame upserts by `task_id` (a `task` frame with `status: "ended"` is the final update for that task).
+  - `task.list` is a full replacement snapshot of running tasks for `(session_id, agent_id)` (discard local running entries absent from the snapshot); each incremental `task` frame upserts by `task_id` (a `task` frame with `status: "ended"` is the final update for that task). WS `task.stop` stops only that task — if the task is still foregrounded, its stop result returns to the waiting tool call and the agent continues the turn (use `POST /api/v1/sessions/{session_id}:cancel` to cancel the turn itself).
   - `task.output` carries `{ session_id, agent_id, task_id, offset, text }` where `offset` is a **UTF-8 byte offset** (not JS string `.length`). Maintain `endOffset = offset + Buffer.byteLength(text, 'utf8')`. When re-watching with `since_offset: endOffset`, append `text` if `chunk.offset === endOffset`, otherwise replace your buffer starting at `chunk.offset`.
   - Task command error codes: `40001` (malformed frame), `40302` (`viewer` calling `task.stop`/`task.background`), `40401` (session not found), `40406` (agent/task not found), `40933` (task not detachable), `50003` (persisted task output unreadable), `50001` (internal error).
 - **Reconnection**: Subscriptions and `task.watch` streams are connection-scoped. After reconnecting: (1) clear cached pending `interaction` cards for the session (on resubscribe, the server sends only currently pending `interaction` frames right after `response` without replaying missed `status: "ended"` frames, so any local card absent from that initial batch was resolved while offline and must be closed), resend `subscribe`, and replace local session state from the fresh snapshots, (2) resend `task.watch` with `since_offset`, and (3) re-fetch REST lists (`GET /api/v1/sessions`, etc.).
