@@ -61,7 +61,7 @@ When attaching to a user's running `kimi web` server or Kimi Code Desktop app:
      "host_version": "2.6.2"
    }
    ```
-   Verify `pid` is alive (e.g. `kill(pid, 0)`) and confirm `GET http://<host>:<port>/api/v1/healthz` returns `200`.
+   Verify `pid` is alive (e.g. `kill(pid, 0)`) and confirm `GET http://<host>:<port>/api/v1/healthz` returns `200` (when attaching via Option B1 or B2 without an already-issued token, also require `data.access_tokens === true` so you skip private `kimi web --json` subprocess instances).
 2. **Option B1 — Passwordless approval handshake** (works seamlessly with both Desktop/Web UI and pure CLI `kimi web`):
    - Call `POST /api/v1/access/requests` (unauthenticated; rate-limited; validates `Host`, and rejects any browser `Origin` not on the server's allowlist with `403`):
      ```json
@@ -128,7 +128,7 @@ KAP `/api/v1` enforces three evolution rules so third-party clients work reliabl
 
 ### Wire conventions & response envelope
 
-- **Field naming & units**: KAP envelope, route, and event wire fields use `snake_case` (passthrough exceptions: managed OAuth `limit5h`/`usedRatio`/`resetAt`/`userInfo`/`userId`, `:undo` `40911` `data` `{ reason, requestedCount, undoableCount }`, and opaque caller/engine passthrough payloads such as `tool_call.input`, `tool_call.display`, `tool_call.fields`, `origin`, and caller `metadata`). Timestamps are ISO 8601 strings; durations end with `_ms`.
+- **Field naming & units**: KAP envelope, route, and event wire fields use `snake_case` (passthrough exceptions: managed OAuth `limit5h`/`usedRatio`/`resetAt`/`userInfo`/`userId`, `:undo` `40911` `data` `{ reason, requestedCount, undoableCount }`, and opaque caller/engine passthrough payloads such as `tool_call.input`, `tool_call.display`, `tool_call.fields`, `origin`, and caller `metadata`). Timestamps are ISO 8601 strings; durations end with `_ms` (exceptions in seconds: `POST /api/v1/files` `expires_in_sec` and `/api/v1/oauth/login` device-flow `expires_in` / `interval`).
 - **Opaque IDs**: Treat `session_id`, `turn_id`, `item_id`, `interaction_id`, `task_id`, `workspace_id`, and `principal_id` as opaque strings. `turn_id` and `item_id` are deterministic across WebSocket frames and `GET .../turns` history.
 - **Standard JSON envelope**: Every `/api/v1` JSON response (except `204` empty responses, raw binary streams, and `stream: true` on `POST /api/v1/workspace/fs:suggest` / `POST /api/v1/fs:suggest` — which streams HTTP `200` `application/x-ndjson` lines of `code: 0` envelopes where `data.phase` is `"preview"` / `"final"` replacing earlier suggestions, or `"error"` with `data.error: { code, message }` on mid-stream failure) has the shape:
   ```json
@@ -349,7 +349,7 @@ S {"type": "agent", "event_created_at": "2026-11-17T04:00:01.800Z", "session_id"
 Maintain turns per `(session_id, agent_id)` sorted by `ordinal`, and reduce frames defensively:
 
 - **`turns` snapshot**: Full replacement for that agent's conversation view (also re-sent automatically when an idle-reclaimed session reopens or `:reload` executes) — clear all stored turns and cancel/discard any in-flight `GET .../turns` pagination requests for that agent before installing `frame.turns` and `frame.has_more`.
-- **`turn.started` & `turn.ended` omit `items`**: `frame.turn` contains turn header fields only. Upsert the turn header by `turn_id` and **preserve your existing `turn.items` array**.
+- **`turn.started` & `turn.ended` omit `items`**: `frame.turn` contains turn header fields only. Replace the entire turn header with `{ ...frame.turn, items: existing?.items ?? [] }` (carrying over **only** your existing `items` array so omitted header fields like `outcome`, `ended_at`, or `retry` do not linger from a prior state).
 - **`turn.updated`**: Upsert `frame.step` into `turn.steps` by `step.index`; set `turn.retry = frame.retry` (when `frame.retry` is omitted, clear any active retry state).
 - **`item.started` may carry non-empty initial text (lazy start)**: For `assistant_message` and `reasoning`, the server emits `item.started` on the first content chunk so **`item.started.item.text` is already non-empty**, and short replies frequently transition directly from `item.started` to `item.ended` with **zero** `item.delta` frames (`tool_call` `item.started` may start with `input_text: ""` when the tool name arrives before its arguments, or with the initial argument chunk, and starts without an `output` field). Always apply:
   ```js
@@ -438,7 +438,7 @@ S {"type": "response", "request_id": "s1-stop", "code": 0, "task": {"task_id": "
 
 - **Never parse human startup banners or read `~/.kimi-code/server.token`**: Spawn `kimi web --port 0 --json` and parse line 1 of `stdout`, or use `/api/v1/access/requests` / `kimi access create` against a running server.
 - **Check `meta.capabilities` instead of `server_version`**: Feature availability across versions is exposed as booleans on `GET /api/v1/meta` → `data.capabilities`.
-- **Do not overwrite `turn.items` on `turn.ended`**: `turn.started` and `turn.ended` omit `items`; only merge header properties.
+- **Do not overwrite `turn.items` on `turn.ended`**: `turn.started` and `turn.ended` omit `items`; replace the turn header as `{ ...frame.turn, items: existing?.items ?? [] }` so `items` are preserved without retaining stale header properties.
 - **Do not assume `item.started` has empty `text` / `input_text`**: Initial chunks arrive inside `item.started.item`; short responses emit zero `item.delta` frames. Always use `(item[field] ?? '') + delta` on `item.delta`.
 - **Do not stop waiting on the initial `turn_id`'s `turn.ended` when steering**: Mid-stream `/steer` can interrupt the current turn and open a new continuation `Turn`; wait until all submitted `prompt_id`s are consumed **and** `agent.status === "idle"`.
 - **Never block your WebSocket loop awaiting `POST /steer`**: Direct `/steer` blocks until an injection point, which stalls forever if an `interaction` approval arrives and nobody reads the WebSocket to approve it.
@@ -511,7 +511,7 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | `GET /api/v1/fs:browse` / `:home` / `:content` & `POST /api/v1/fs:mkdir` / `:suggest` | `owner` | `fs_query` | Host-wide folder picker and arbitrary host file reader (`owner` only) |
 | `POST /api/v1/search` | `viewer` | `baseline` | Eventually consistent full-text search across persisted session messages (in-flight streaming turns appear after persistence & background index sync; inspect `data.index_state.stale` to detect catch-up) |
 | `GET /api/v1/workspaces` & `GET /api/v1/workspaces/{id}/trust` & `/skills` | `viewer` | `baseline` | List registered workspaces, workspace trust status, and workspace skills |
-| `POST` / `PATCH` / `DELETE /api/v1/workspaces*` & `GET .../project-config-dirs` | `owner` | `baseline` | Register, rename, delete, set primary dir, or change trust of workspaces (`owner` only) |
+| `POST` / `PATCH` / `DELETE /api/v1/workspaces*` & `GET .../project-config-dirs` | `owner` | `baseline` | Register, rename, delete, set primary dir, or change trust of workspaces (`PATCH .../workspaces/{id}` `additional_dirs` replaces the workspace's entire additional-directory list — submit the full edited array; `owner` only) |
 
 ### Models, providers, config, tools, capabilities, plugins, MCP & OAuth
 
@@ -519,14 +519,14 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | --- | --- | --- | --- |
 | `GET /api/v1/auth` | `viewer` | `baseline` | Auth & model readiness summary |
 | `GET /api/v1/models` & `GET /api/v1/providers` & `/providers/{id}` & `/catalog/providers*` | `viewer` | `baseline` | List configured model aliases, configured providers (`api_key` redacted for non-`owner`; `owner` receives stored `api_key` on `/providers/{id}`), and `models.dev` catalog |
-| `POST /api/v1/models/{id}:set_default` & `POST`/`PUT`/`DELETE /api/v1/providers*` | `owner` | `baseline` | Set default model or create/update/delete/import/refresh providers (`owner` only) |
-| `GET /api/v1/config` / `POST /api/v1/config` | `viewer` / `owner` | `baseline` | Read redacted global config (`viewer+`) or merge-patch global config (`owner` only) |
+| `POST /api/v1/models/{id}:set_default` & `POST`/`PUT`/`DELETE /api/v1/providers*` | `owner` | `baseline` | Set default model or create/update/delete/import/refresh providers (`PUT /providers/{id}` replaces that provider's entire `models` alias set and treats `api_key: ""` as clearing the stored key; `:import_registry` reconciles against the upstream URL, pruning removed providers/aliases and updating or clearing the default model; `owner` only) |
+| `GET /api/v1/config` / `POST /api/v1/config` | `viewer` / `owner` | `baseline` | Read redacted global config (`viewer+`) or merge-patch global config (`owner` only; `{ "yolo": true }` maps to `default_permission_mode: "yolo"`, whereas `{ "yolo": false }` is ignored — set `default_permission_mode` to `"manual"` or `"auto"` to leave `yolo`) |
 | `GET /api/v1/tools` | `viewer` | `baseline` | List registered agent tools |
 | `GET /api/v1/capabilities` & `/capabilities/{id}` / `POST /api/v1/capabilities/{id}:install` | `viewer` / `owner` | `baseline` | Inspect built-in capabilities (`viewer+`) or trigger install (`owner` only) |
 | `GET /api/v1/plugins` & `/plugins/{id}` / `GET /api/v1/plugins/marketplace` & `POST /api/v1/plugins*` | `viewer` / `owner` | `baseline` | Read installed plugins (`viewer+`) or browse/reconcile marketplace and preview/install/enable/disable/remove (`owner` only) |
 | `GET /api/v1/mcp/servers*` & `/mcp/auth-statuses` / `POST`/`PUT`/`DELETE /api/v1/mcp/*` | `viewer` / `owner` | `mcp` | Read MCP servers (redacted for non-`owner`) & offline auth statuses (`viewer+`; `verify=true` requires `owner`) or mutate/test/inspect/OAuth global MCP servers (`owner` only) |
 | `GET /api/v1/oauth/usage` & `/oauth/userinfo` & `/oauth/region` | `viewer` | `baseline` | Read managed account quota, profile, and region |
-| `GET`/`POST`/`DELETE /api/v1/oauth/login` & `POST /api/v1/oauth/logout` | `owner` | `baseline` | Start/poll/cancel OAuth login or log out (`owner` only) |
+| `GET`/`POST`/`DELETE /api/v1/oauth/login` & `POST /api/v1/oauth/logout` | `owner` | `baseline` | Start/poll/cancel OAuth login or log out (`owner` only; logging out `managed:kimi-code` also clears Remote Control state and tears down any active Remote Control tunnel) |
 | `GET`/`POST`/`PATCH`/`DELETE /api/v1/remote-control*` | `owner` | `baseline` | Manage Kimi Remote Control tunnel and paired devices (`owner` only) |
 
 ### WebSocket `/api/v1/ws` frames

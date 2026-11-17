@@ -40,7 +40,7 @@ KAP 的协议行为规范与接口目录完整维护在 [`https://code.kimi.com/
 外部客户端与编排器**绝不应读取 `~/.kimi-code/server.token`**（该文件仅属 CLI 宿主凭据，且不被桌面端内嵌服务接受），而是按运行形态选择以下标准方式之一：
 
 - **子进程拉起（推荐编排器与独立客户端使用）**：执行 `kimi web --port 0 --json`。进程自动跳过打开浏览器、不读写 `server.token`，在内存中生成仅随本进程存活的临时 `operator` Token，并在 `stdout` 第一行输出单行纯 JSON：`{"origin":"http://127.0.0.1:<port>","ws_url":"ws://127.0.0.1:<port>/api/v1/ws","token":"kap_...","role":"operator","kimi_agent_protocol_version":"0.1.0"}`。
-- **接入本机已运行的桌面端或 `kimi web` 实例**：通过 `~/.kimi-code/server/instances/*.json` 发现存活实例后，调用免密握手接口 `POST /api/v1/access/requests` 获取核对码 `user_code`——桌面端 / Web UI 会弹出极简确认框，纯 CLI 终端会提示运行 `kimi access approve <user_code>`，批准后客户端凭 `device_code` 调用 `:exchange` 一次性领走 `kap_...` Token。
+- **接入本机已运行的桌面端或 `kimi web` 实例**：通过 `~/.kimi-code/server/instances/*.json` 发现存活实例（并通过 `GET /api/v1/healthz` 过滤 `data.access_tokens === true` 的实例）后，调用免密握手接口 `POST /api/v1/access/requests` 获取核对码 `user_code`——桌面端 / Web UI 会弹出极简确认框，纯 CLI 终端会提示运行 `kimi access approve <user_code>`，批准后客户端凭 `device_code` 调用 `:exchange` 一次性领走 `kap_...` Token。
 - **纯 CLI 手动签发与管理**：运行 `kimi access create --name <名称> [--role operator|viewer]` 签发独立 Token（明文仅打印一次），随时通过 `kimi access list` 查看或 `kimi access revoke <id>` 吊销（吊销后运行中的服务热感知并实时断开对应 WebSocket 连接）。
 
 ## 快速开始

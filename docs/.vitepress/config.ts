@@ -218,7 +218,7 @@ const config = withMermaid(defineConfig({
     ]
     for (const locale of ['en', 'zh'] as const) {
       const guideTarget = `${base}${locale}/guides/kap.html`
-      const specTarget = `${base}kap.md`
+      const specTarget = `${base}${locale}/reference/kap-spec.html`
       const quickStartHash = locale === 'zh' ? '#快速开始' : '#quick-start'
       const authHash = locale === 'zh' ? '#连接与鉴权方式' : '#connecting-and-authenticating'
       const refDir = resolve(outDir, locale, 'reference')
