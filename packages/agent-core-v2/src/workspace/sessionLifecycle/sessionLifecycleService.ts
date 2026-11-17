@@ -296,7 +296,16 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
       const sessionDir = handle.accessor.get(ISessionContext).sessionDir;
       this.sessions.delete(sessionId);
       await this.drainAgents(handle).catch(() => {});
+      const sessionAppendLog =
+        opts.ephemeral === true ? handle.accessor.get(IAppendLogStore) : this.appendLogStore;
+      await sessionAppendLog.drainRetirements().catch(() => {});
+      await drainSessionMetadataWrites().catch(() => {});
       void handle.dispose();
+      await this.environments.drainSession(sessionId).catch(() => {});
+      await drainLogCloses().catch(() => {});
+      if (opts.ephemeral === true) {
+        activeLocalEphemeralDirs.delete(sessionDir);
+      }
       await this.hostFs.remove(sessionDir).catch(() => {});
       if (opts.ephemeral !== true) {
         await this.index.remove(sessionId).catch(() => {});
@@ -636,7 +645,8 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
     await this.announceWillClose({ sessionId, handle, reason });
     try {
       await this.drainAgents(handle);
-      await this.appendLogStore.drainRetirements();
+      const sessionAppendLog = isEphemeral ? handle.accessor.get(IAppendLogStore) : this.appendLogStore;
+      await sessionAppendLog.drainRetirements();
       await drainSessionMetadataWrites();
       if (!isEphemeral) {
         await this.indexMirror.drain();
@@ -653,6 +663,8 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
       this.telemetry.withContext({ session_id: sessionId }).track2('session_ended', ended);
     } catch (error) {
       if (isEphemeral) {
+        await handle.accessor.get(IAppendLogStore)?.drainRetirements?.().catch(() => {});
+        await drainSessionMetadataWrites().catch(() => {});
         void handle.dispose();
         await this.environments.drainSession(sessionId).catch(() => {});
         await drainLogCloses().catch(() => {});
