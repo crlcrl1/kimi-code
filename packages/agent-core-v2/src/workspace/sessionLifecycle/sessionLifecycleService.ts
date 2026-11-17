@@ -327,6 +327,7 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
       ? await mkdtemp(join(tmpdir(), ownerPrefix))
       : sessionDirOf(this.bootstrap.homeDir, this.handlerScope, opts.sessionId);
     if (isEphemeral) {
+      activeLocalEphemeralDirs.add(sessionDir);
       await writeFile(
         join(sessionDir, EPHEMERAL_PID_FILE),
         ownerToken === undefined ? `${process.pid}\n` : `${process.pid}:${ownerToken}\n`,
@@ -343,6 +344,7 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
     } catch (error) {
       workdir.dispose();
       if (isEphemeral) {
+        activeLocalEphemeralDirs.delete(sessionDir);
         await this.hostFs.remove(sessionDir).catch(() => {});
       }
       throw error;
@@ -422,6 +424,7 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
             if (isEphemeral) {
               container.anchorKernelFinalizer(
                 () => {
+                  activeLocalEphemeralDirs.delete(sessionDir);
                   try {
                     rmSync(sessionDir, { recursive: true, force: true });
                   } catch {
@@ -449,6 +452,7 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
       telemetryBinding.dispose();
       workdir.dispose();
       if (isEphemeral) {
+        activeLocalEphemeralDirs.delete(sessionDir);
         await this.hostFs.remove(sessionDir).catch(() => {});
       }
       throw error;
@@ -470,6 +474,7 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
     } catch (error) {
       void handle.dispose();
       if (isEphemeral) {
+        activeLocalEphemeralDirs.delete(sessionDir);
         await this.hostFs.remove(sessionDir).catch(() => {});
       }
       void this.explicitAgentProfileLoader.reload().catch(() => undefined);
@@ -640,6 +645,7 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
       await this.environments.drainSession(sessionId);
       await drainLogCloses();
       if (isEphemeral) {
+        activeLocalEphemeralDirs.delete(ctx.sessionDir);
         await this.hostFs.remove(ctx.sessionDir).catch(() => {});
       }
       this._onDidCloseSession.fire({ sessionId });
@@ -650,6 +656,7 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
         void handle.dispose();
         await this.environments.drainSession(sessionId).catch(() => {});
         await drainLogCloses().catch(() => {});
+        activeLocalEphemeralDirs.delete(ctx.sessionDir);
         await this.hostFs.remove(ctx.sessionDir).catch(() => {});
         this._onDidCloseSession.fire({ sessionId });
       }
@@ -1221,6 +1228,7 @@ const EPHEMERAL_PID_FILE = '.owner-pid';
 const EPHEMERAL_SWEEP_COOLDOWN_MS = 60_000;
 let lastSweptEphemeralDirsAt = 0;
 let ephemeralOwnerBeacon: Promise<void> | undefined;
+const activeLocalEphemeralDirs = new Set<string>();
 let ephemeralOwnerBeaconBound = false;
 
 function ephemeralOwnerEndpoint(token: string): string {
@@ -1318,6 +1326,7 @@ async function sweepStaleEphemeralDirs(): Promise<void> {
       .filter((name) => name.startsWith(EPHEMERAL_DIR_PREFIX))
       .map(async (name) => {
         const dirPath = join(root, name);
+        if (activeLocalEphemeralDirs.has(dirPath)) return;
         try {
           const markerPath = join(dirPath, EPHEMERAL_PID_FILE);
           const prefixMatch = EPHEMERAL_OWNER_PREFIX_RE.exec(name);
@@ -1334,9 +1343,7 @@ async function sweepStaleEphemeralDirs(): Promise<void> {
           }
           if (!Number.isFinite(pid)) return;
           if (pid === process.pid) {
-            if (token !== EPHEMERAL_INCARNATION_TOKEN) {
-              await rm(dirPath, { recursive: true, force: true });
-            }
+            await rm(dirPath, { recursive: true, force: true });
             return;
           }
           if (!isPidAlive(pid)) {
