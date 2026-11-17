@@ -312,7 +312,21 @@ export class ReadTool implements IReadTool {
     if (!environmentPath.isAbsolute(path)) return undefined;
     const normalized = environmentPath.normalize(path);
     const taskOutput = this.session !== undefined && this.agent !== undefined && (
+      isTaskOutputFilePath(
+        normalized,
+        this.session.ephemeral === true
+          ? environmentPath.join(this.session.sessionDir, this.agent.scope())
+          : environmentPath.join(this.session.sessionDir, 'agents', this.agent.agentId),
+        environmentPath,
+      ) ||
       isTaskOutputFilePath(normalized, environmentPath.join(this.session.sessionDir, 'agents', this.agent.agentId), environmentPath) ||
+      (this.agent.agentId === 'main' && isTaskOutputFilePath(
+        normalized,
+        this.session.ephemeral === true
+          ? environmentPath.join(this.session.sessionDir, this.session.scope())
+          : this.session.sessionDir,
+        environmentPath,
+      )) ||
       (this.agent.agentId === 'main' && isTaskOutputFilePath(normalized, this.session.sessionDir, environmentPath))
     );
     const ephemeralWire =

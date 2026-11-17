@@ -201,13 +201,25 @@ export class SessionEventBroadcaster {
     this.globalTargets.delete(target);
   }
 
+  retainPendingSubscribe(sessionId: string): () => void {
+    this.pendingSubscribes.set(sessionId, (this.pendingSubscribes.get(sessionId) ?? 0) + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const remaining = (this.pendingSubscribes.get(sessionId) ?? 1) - 1;
+      if (remaining <= 0) this.pendingSubscribes.delete(sessionId);
+      else this.pendingSubscribes.set(sessionId, remaining);
+    };
+  }
+
   async subscribe(
     sessionId: string,
     target: BroadcastTarget,
     agentIds: readonly string[],
     accepted?: () => void,
   ): Promise<void> {
-    this.pendingSubscribes.set(sessionId, (this.pendingSubscribes.get(sessionId) ?? 0) + 1);
+    const release = this.retainPendingSubscribe(sessionId);
     try {
       let session: ISessionScopeHandle | undefined;
       try {
@@ -245,9 +257,7 @@ export class SessionEventBroadcaster {
       this.sendAgentLists(state, target, added);
       for (const agentId of new Set(agentIds)) void this.sync(state, target, agentId);
     } finally {
-      const remaining = (this.pendingSubscribes.get(sessionId) ?? 1) - 1;
-      if (remaining <= 0) this.pendingSubscribes.delete(sessionId);
-      else this.pendingSubscribes.set(sessionId, remaining);
+      release();
     }
   }
 

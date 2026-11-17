@@ -76,6 +76,7 @@ export class WsConnectionV1 implements BroadcastTarget {
 
   private closed = false;
   private controlQueue: Promise<void> = Promise.resolve();
+  private readonly queuedSubscribeReleases = new Set<() => void>();
 
   private outbound: unknown[] = [];
   private flushTimer?: ReturnType<typeof setTimeout>;
@@ -155,7 +156,23 @@ export class WsConnectionV1 implements BroadcastTarget {
       return;
     }
     if (frame.type === 'subscribe') {
-      this.enqueueControl(() => this.onSubscribe(requestId, frame));
+      const maybeSid = (frame as { session_id?: unknown }).session_id;
+      const releaseQueued =
+        typeof maybeSid === 'string' && maybeSid.trim().length > 0
+          ? this.broadcaster.retainPendingSubscribe?.(maybeSid)
+          : undefined;
+      if (releaseQueued !== undefined) this.queuedSubscribeReleases.add(releaseQueued);
+      this.enqueueControl(async () => {
+        try {
+          if (this.closed) return;
+          await this.onSubscribe(requestId, frame);
+        } finally {
+          if (releaseQueued !== undefined) {
+            this.queuedSubscribeReleases.delete(releaseQueued);
+            releaseQueued();
+          }
+        }
+      });
     } else if (frame.type === 'unsubscribe') {
       this.enqueueControl(() => this.onUnsubscribe(requestId, frame));
     } else if (
@@ -318,6 +335,8 @@ export class WsConnectionV1 implements BroadcastTarget {
     if (this.backpressureRetryTimer !== undefined) clearTimeout(this.backpressureRetryTimer);
     if (this.heartbeatTimer !== undefined) clearInterval(this.heartbeatTimer);
     this.outbound = [];
+    for (const release of this.queuedSubscribeReleases) release();
+    this.queuedSubscribeReleases.clear();
     this.taskRequests.dispose();
     this.broadcaster.removeTarget(this);
   }

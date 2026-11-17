@@ -59,10 +59,16 @@ export class AgentTaskOutputService implements IAgentTaskOutputService {
     @ILogService private readonly log: ILogService,
   ) {
     const fallbackRoot = scopeContext.agentId === 'main'
-      ? { dir: session.sessionDir, scope: session.scope() }
+      ? {
+          dir: session.ephemeral === true ? join(session.sessionDir, session.scope()) : session.sessionDir,
+          scope: session.scope(),
+        }
       : undefined;
+    const primaryAgentDir = session.ephemeral === true
+      ? join(session.sessionDir, scopeContext.scope())
+      : join(session.sessionDir, 'agents', scopeContext.agentId);
     this.persistence = new AgentTaskPersistence(
-      join(session.sessionDir, 'agents', scopeContext.agentId),
+      primaryAgentDir,
       scopeContext.scope(),
       byteStore,
       fallbackRoot,

@@ -433,5 +433,42 @@ describe('AgentTaskPersistence', () => {
     expect(recreated?.dir).toBe('/remote/tmp/kimi-code/ephemeral-s_ephem/task-output');
     expect(tracked).toHaveLength(2);
   });
+
+  it('returns the physical output.log path inside sessionDir for local ephemeral sessions', async () => {
+    const localEnv = {
+      identity: { environmentId: 'local', generation: 0 },
+    } as unknown as Environment;
+    const localEnvService = {
+      inspect: () => localEnv,
+      acquire: () => ({ environment: localEnv, track: (r: unknown) => r, dispose: () => {} }),
+    } as unknown as IAgentEnvironmentService;
+    const sessionCtx = {
+      _serviceBrand: undefined,
+      sessionId: 's_local_ephem',
+      workspaceId: 'ws_1',
+      sessionDir,
+      metaScope: SESSION_SCOPE,
+      cwd: sessionDir,
+      ephemeral: true,
+      scope: (sub?: string) => (sub ? `${SESSION_SCOPE}/${sub}` : SESSION_SCOPE),
+    } satisfies ISessionContext;
+    const agentScope = {
+      _serviceBrand: undefined,
+      agentId: 'main',
+      scope: (sub?: string) => (sub ? `${AGENT_SCOPE}/${sub}` : AGENT_SCOPE),
+    } as unknown as IAgentScopeContext;
+    const service = new AgentTaskOutputService(
+      bytes,
+      sessionCtx,
+      agentScope,
+      localEnvService,
+      { error: () => {} } as unknown as ILogService,
+    );
+
+    await service.appendTaskOutput('bash-loc00001', 'local-ephemeral-output');
+    const snapshot = await service.readTaskOutputSnapshot('bash-loc00001', 64);
+    expect(snapshot?.outputPath).toBe(join(sessionDir, AGENT_SCOPE, 'tasks', 'bash-loc00001', 'output.log'));
+    expect((await stat(snapshot!.outputPath)).size).toBe(22);
+  });
   });
 });
