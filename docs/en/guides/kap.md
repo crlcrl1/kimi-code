@@ -83,6 +83,18 @@ const done = new Promise((resolve, reject) => {
       ws.send(JSON.stringify({ type: 'pong' }));
       return;
     }
+    if (frame.type === 'interaction' && frame.status === 'pending') {
+      const body =
+        frame.kind === 'approval'
+          ? { kind: 'approval', decision: 'rejected', feedback: 'Unattended quick-start script' }
+          : { kind: 'question', dismissed: true };
+      await fetch(`${origin}/api/v1/sessions/${session.id}/interactions/${frame.interaction_id}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      return;
+    }
     if (frame.type === 'turns' && !promptConsumed) {
       const submit = await fetch(`${origin}/api/v1/sessions/${session.id}/prompts`, {
         method: 'POST',

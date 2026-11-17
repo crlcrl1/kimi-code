@@ -216,6 +216,18 @@ const done = new Promise((resolve, reject) => {
       ws.send(JSON.stringify({ type: 'pong' }));
       return;
     }
+    if (frame.type === 'interaction' && frame.status === 'pending') {
+      const body =
+        frame.kind === 'approval'
+          ? { kind: 'approval', decision: 'rejected', feedback: 'Unattended quick-start script' }
+          : { kind: 'question', dismissed: true };
+      await fetch(`${origin}/api/v1/sessions/${session.id}/interactions/${frame.interaction_id}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      return;
+    }
     if (frame.type === 'turns' && !promptConsumed) {
       const submit = await fetch(`${origin}/api/v1/sessions/${session.id}/prompts`, {
         method: 'POST',
@@ -417,7 +429,7 @@ S {"type": "response", "request_id": "s1-stop", "code": 0, "task": {"task_id": "
 
 - **Task list & output (`task.list`, `task`, `task.output`)**:
   - `task.list` is a full replacement snapshot of running tasks for `(session_id, agent_id)` (discard local running entries absent from the snapshot); each incremental `task` frame upserts by `task_id` (a `task` frame with `status: "ended"` is the final update for that task). WS `task.stop` stops only that task — if the task is still foregrounded, its stop result returns to the waiting tool call and the agent continues the turn (use `POST /api/v1/sessions/{session_id}:cancel` to cancel the turn itself).
-  - `task.output` carries `{ session_id, agent_id, task_id, offset, text }` where `offset` is a **UTF-8 byte offset** (not JS string `.length`). Maintain `endOffset = offset + Buffer.byteLength(text, 'utf8')`. When re-watching with `since_offset: endOffset`, append `text` if `chunk.offset === endOffset`, otherwise replace your buffer starting at `chunk.offset`.
+  - `task.output` carries `{ session_id, agent_id, task_id, offset, text }` where `offset` is a **UTF-8 byte offset** (not JS string `.length`). Without `since_offset`, `task.watch` replays a bounded tail of historical output (`tail_bytes` defaults to 32 KiB, capped at 1 MiB — so `offset` on the initial chunk may be `> 0`), and already-ended tasks remain watchable to retrieve persisted output. Maintain `endOffset = offset + Buffer.byteLength(text, 'utf8')`. When re-watching with `since_offset: endOffset`, append `text` if `chunk.offset === endOffset`, otherwise replace your buffer starting at `chunk.offset`.
   - Task command error codes: `40001` (malformed frame), `40302` (`viewer` calling `task.stop`/`task.background`), `40401` (session not found), `40406` (agent/task not found), `40933` (task not detachable), `50003` (persisted task output unreadable), `50001` (internal error).
 - **Reconnection**: Subscriptions and `task.watch` streams are connection-scoped. After reconnecting: (1) clear cached pending `interaction` cards for the session (on resubscribe, the server sends only currently pending `interaction` frames right after `response` without replaying missed `status: "ended"` frames, so any local card absent from that initial batch was resolved while offline and must be closed), resend `subscribe`, and replace local session state from the fresh snapshots, (2) resend `task.watch` with `since_offset`, and (3) re-fetch REST lists (`GET /api/v1/sessions`, etc.).
 - **Global events & archive/restore lifecycle**: Sent flat to all connections without subscription: `session` (`change`: `created`/`updated`/`archived`/`restored`/`deleted`), `workspace` (`change`), `config`, `invalidated` (`kind`: `models`/`plugins` → refetch REST endpoint), `event.capability.changed`, and `event.access.request` (`owner` connections only). Note that archiving or deleting a session evicts its server-side subscriptions — if an archived session is later restored (`change: "restored"`), send `subscribe` again to resume receiving its frames. Changes made on disk by external CLI processes reconcile every ~60 s without WS broadcasts; dashboards should poll `GET /api/v1/sessions` at low frequency (~60 s or on focus).
@@ -460,7 +472,7 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | `POST /api/v1/sessions` | `operator` | `baseline` | Create a session (`cwd` or `workspace_id`, optional `title`, `metadata`, `agent_config`, `environment_id`) |
 | `GET /api/v1/sessions` | `viewer` | `baseline` | List/filter/group sessions (`flat` or `by_workspace`, `include=git`, `fields=id,archived`, pagination) |
 | `GET /api/v1/sessions/{session_id}` | `viewer` | `baseline` | Get one session object |
-| `POST /api/v1/sessions/{session_id}/profile` | `operator` | `baseline` | Update `title`, `metadata`, or main `agent_config` (`model`, `thinking`, `permission_mode`, `plan_mode`, `swarm_mode`, `tower_mode`, `goal`) |
+| `POST /api/v1/sessions/{session_id}/profile` | `operator` | `baseline` | Update `title`, `metadata` (replaces all non-reserved custom metadata keys as a whole — submit the complete custom object), or main `agent_config` (`model`, `thinking`, `permission_mode`, `plan_mode`, `swarm_mode`, `tower_mode`, `goal`) |
 | `POST /api/v1/sessions/{session_id}/title/generate` | `operator` | `baseline` | Generate a session title from conversation context |
 | `POST /api/v1/sessions:archive` / `:restore` | `operator` | `baseline` | Batch archive or restore sessions by `ids` |
 | `POST /api/v1/sessions/{session_id}:archive` / `:restore` / `:delete` | `operator` | `baseline` | Archive, restore, or permanently delete one session |
@@ -497,7 +509,7 @@ Fetch `GET /openapi.json` and `GET /asyncapi.json` for exact parameter and paylo
 | `GET /api/v1/sessions/{session_id}/fs/{path}:download` | `viewer` | `fs_query` | Download file inside session workspace (`Range`/`ETag`) |
 | `POST /api/v1/workspace/fs:list` / `:search` / `:suggest` | `operator` | `fs_query` | Workspace-scoped fs queries without a session (`operator` restricted to registered `workspace_id`; `owner` may also pass an absolute root) |
 | `GET /api/v1/fs:browse` / `:home` / `:content` & `POST /api/v1/fs:mkdir` / `:suggest` | `owner` | `fs_query` | Host-wide folder picker and arbitrary host file reader (`owner` only) |
-| `POST /api/v1/search` | `viewer` | `baseline` | Full-text search across session messages |
+| `POST /api/v1/search` | `viewer` | `baseline` | Eventually consistent full-text search across persisted session messages (in-flight streaming turns appear after persistence & background index sync; inspect `data.index_state.stale` to detect catch-up) |
 | `GET /api/v1/workspaces` & `GET /api/v1/workspaces/{id}/trust` & `/skills` | `viewer` | `baseline` | List registered workspaces, workspace trust status, and workspace skills |
 | `POST` / `PATCH` / `DELETE /api/v1/workspaces*` & `GET .../project-config-dirs` | `owner` | `baseline` | Register, rename, delete, set primary dir, or change trust of workspaces (`owner` only) |
 
