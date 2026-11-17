@@ -207,7 +207,7 @@ export class TaskRequests {
       });
       const watchRelease = this.sessionRetainer?.retain(sessionId);
       let watchReleased = false;
-      this.watches.set(key, {
+      const watchDisposable = {
         dispose: () => {
           unobserve?.();
           if (!watchReleased) {
@@ -215,7 +215,12 @@ export class TaskRequests {
             watchRelease?.();
           }
         },
-      });
+      };
+      if (this.disposed) {
+        watchDisposable.dispose();
+        return;
+      }
+      this.watches.set(key, watchDisposable);
 
       let tail: AgentTaskOutputTail;
       try {
@@ -234,7 +239,10 @@ export class TaskRequests {
         fail(ErrorCode.PERSISTENCE_FAILURE, 'task output unavailable');
         return;
       }
-      if (this.disposed) return;
+      if (this.disposed) {
+        this.unwatch(key);
+        return;
+      }
 
       const first = firstChunk(tail.offset, tail.data, request.since_offset);
       const info = taskInfo(resolved.channel, taskId);
